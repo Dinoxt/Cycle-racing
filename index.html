@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cycle Dash!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            background-color: #84cc16;
+        }
+        /* Cartoon Striped Background like Reference Image 2 */
+        .striped-bg {
+            background: repeating-linear-gradient(
+                105deg,
+                #84cc16,
+                #84cc16 45px,
+                #65a30d 45px,
+                #65a30d 90px
+            );
+        }
+        /* Thick Dark Navy Outlines & Drop Shadows */
+        .cartoon-title {
+            color: #ffffff;
+            -webkit-text-stroke: 7px #161e31;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 6px 0px #161e31);
+            letter-spacing: 1px;
+        }
+        .cartoon-subtitle {
+            color: #ffffff;
+            -webkit-text-stroke: 4px #161e31;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 3px 0px #161e31);
+        }
+        .cartoon-pill {
+            background: #ffffff;
+            border: 3.5px solid #161e31;
+            box-shadow: 0px 4px 0px #161e31;
+            border-radius: 9999px;
+            color: #161e31;
+            font-weight: 800;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+            cursor: pointer;
+        }
+        .cartoon-pill:active {
+            transform: translateY(3px);
+            box-shadow: 0px 1px 0px #161e31;
+        }
+        .cartoon-panel {
+            background: #ffffff;
+            border: 5px solid #161e31;
+            box-shadow: 0px 8px 0px #161e31;
+            border-radius: 28px;
+        }
+        /* Floating 3D Rank Labels */
+        .racer-label {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            font-weight: 800;
+            color: #ffffff;
+            -webkit-text-stroke: 3.5px #161e31;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 2px 0px #161e31);
+            font-size: 1.15rem;
+            white-space: nowrap;
+            transition: opacity 0.15s;
+        }
+        .racer-label.player-label {
+            color: #facc15;
+            font-size: 1.45rem;
+            -webkit-text-stroke: 4px #161e31;
+        }
+        /* Checkered flag pattern */
+        .checkered-box {
+            background-image: 
+                linear-gradient(45deg, #161e31 25%, transparent 25%), 
+                linear-gradient(-45deg, #161e31 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #161e31 75%), 
+                linear-gradient(-45deg, transparent 75%, #161e31 75%);
+            background-size: 12px 12px;
+            background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+            background-color: #ffffff;
+        }
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="striped-bg relative select-none">
+
+    <!-- 3D WebGL Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Dynamic Floating 3D Rank Labels Container -->
+    <div id="labels-container" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+    <!-- Speed Lines Overlay -->
+    <div id="boost-overlay" class="absolute inset-0 pointer-events-none z-10 opacity-0 transition-opacity duration-200"
+         style="background: radial-gradient(circle, transparent 55%, rgba(56, 189, 248, 0.35) 100%);"></div>
+
+    <!-- HUD / UI Overlay -->
+    <div class="relative z-20 flex flex-col justify-between w-full h-full p-3 sm:p-5 pointer-events-none">
+
+        <!-- Top Bar (Matches Cup Pong Reference UI) -->
+        <div class="flex justify-between items-start w-full">
+            <!-- Left Pill: Level & Rank Badge -->
+            <div class="cartoon-pill px-4 py-1.5 flex items-center gap-2 text-base sm:text-lg pointer-events-auto">
+                <span class="text-[#84cc16]">LVL <span id="hud-level">1</span></span>
+                <span class="text-gray-400">-</span>
+                <span id="hud-rank-top" class="text-[#38bdf8]">7th</span>
+            </div>
+
+            <!-- Center Title & Progress Bar -->
+            <div class="flex flex-col items-center">
+                <h1 id="main-title" class="cartoon-title text-4xl sm:text-6xl tracking-wide transition-all duration-300">
+                    Cycle Dash
+                </h1>
+
+                <!-- Level Progress Bar (Matches First Image Pink Progress Bar + Cartoon Outline) -->
+                <div class="mt-2 flex items-center bg-white border-[3.5px] border-[#161e31] rounded-full h-7 w-52 sm:w-72 p-1 shadow-[0_4px_0_#161e31] relative">
+                    <div id="level-badge" class="bg-[#ec4899] text-white text-xs sm:text-sm font-extrabold px-2.5 py-0.5 rounded-full border-2 border-[#161e31] z-10">
+                        1
+                    </div>
+                    <div class="flex-1 h-full bg-slate-200 rounded-full mx-1.5 overflow-hidden relative">
+                        <div id="progress-fill" class="h-full bg-[#f43f5e] w-0 rounded-full transition-all duration-75"></div>
+                    </div>
+                    <div class="w-6 h-5 rounded-full border-2 border-[#161e31] checkered-box flex-shrink-0"></div>
+                </div>
+
+                <!-- Large Live Position Display -->
+                <div id="big-rank-display" class="cartoon-subtitle text-4xl sm:text-5xl mt-1">
+                    7th
+                </div>
+            </div>
+
+            <!-- Right Pill: Pause / Restart -->
+            <button id="btn-pause" class="cartoon-pill px-4 py-1.5 text-sm sm:text-base pointer-events-auto uppercase tracking-wider">
+                PAUSE
+            </button>
+        </div>
+
+        <!-- Center Prompt / Countdown / Modals -->
+        <div class="flex flex-col items-center justify-center my-auto">
+            <!-- Drag / Steering Prompt (Matches "Drag / Flick to Shoot" black pill from Reference 2) -->
+            <div id="steer-prompt" class="bg-[#161e31]/90 text-white px-5 py-2 rounded-full border-2 border-white/25 text-xs sm:text-sm font-bold tracking-wide shadow-lg animate-pulse">
+                Drag / Touch or Arrow Keys to Steer &bull; Hit Blue Pads!
+            </div>
+
+            <!-- Finish / Pause Modal -->
+            <div id="game-modal" class="cartoon-panel p-6 sm:p-8 max-w-sm w-[90%] text-center hidden pointer-events-auto transform transition-all">
+                <div id="modal-badge" class="inline-block bg-[#facc15] text-[#161e31] border-[3px] border-[#161e31] px-4 py-1 rounded-full font-extrabold text-sm mb-2 shadow-[0_3px_0_#161e31]">
+                    RACE COMPLETE
+                </div>
+                <h2 id="modal-title" class="cartoon-title text-4xl sm:text-5xl mb-2">1st Place!</h2>
+                <p id="modal-desc" class="text-[#161e31] font-bold text-base sm:text-lg mb-6">
+                    You smoked the competition on the track!
+                </p>
+                <div class="flex gap-3 justify-center">
+                    <button id="btn-retry" class="cartoon-pill px-5 py-2.5 text-base bg-slate-100">
+                        RETRY
+                    </button>
+                    <button id="btn-next" class="cartoon-pill px-6 py-2.5 text-base !bg-[#84cc16] !text-white" style="-webkit-text-stroke: 1.5px #161e31;">
+                        NEXT RACE &rarr;
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar Pills (Matches Sound & vs Bot Pills from Reference 2) -->
+        <div class="flex justify-center items-center gap-3 w-full pb-1">
+            <button id="btn-sound" class="cartoon-pill px-4 py-1.5 text-xs sm:text-sm flex items-center gap-1.5 pointer-events-auto">
+                <span id="sound-icon">🔊</span>
+                <span id="sound-text">Sound</span>
+            </button>
+            <button id="btn-bot-mode" class="cartoon-pill px-4 py-1.5 text-xs sm:text-sm flex items-center gap-1.5 pointer-events-auto">
+                <span>🤖</span>
+                <span id="bot-text">vs 6 Bots: Normal</span>
+            </button>
+            <button id="btn-cam" class="cartoon-pill px-4 py-1.5 text-xs sm:text-sm flex items-center gap-1.5 pointer-events-auto hidden sm:flex">
+                <span>🎥</span>
+                <span id="cam-text">Cam: Chase</span>
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        /**************************************************************
+         * AUDIO SYNTHESIS (Tone.js - Self-contained Cartoon SFX)
+         **************************************************************/
+        let soundEnabled = true;
+        let audioInitialized = false;
+        let synth, padSynth, bumpSynth;
+
+        async function initAudio() {
+            if (audioInitialized) return;
+            try {
+                await Tone.start();
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.01, decay: 0.12, sustain: 0.05, release: 0.2 }
+                }).toDestination();
+                synth.volume.value = -8;
+
+                padSynth = new Tone.Synth({
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.01, decay: 0.25, sustain: 0.1, release: 0.3 }
+                }).toDestination();
+                padSynth.volume.value = -6;
+
+                bumpSynth = new Tone.MembraneSynth().toDestination();
+                bumpSynth.volume.value = -5;
+
+                audioInitialized = true;
+            } catch (e) {
+                console.warn("Audio init skipped:", e);
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioInitialized) return;
+            try {
+                const now = Tone.now();
+                if (type === 'boost') {
+                    padSynth.triggerAttackRelease("C5", "16n", now);
+                    padSynth.triggerAttackRelease("E5", "16n", now + 0.06);
+                    padSynth.triggerAttackRelease("G5", "8n", now + 0.12);
+                } else if (type === 'bump') {
+                    bumpSynth.triggerAttackRelease("G1", "8n", now);
+                } else if (type === 'win') {
+                    synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now);
+                    synth.triggerAttackRelease(["E4", "G4", "C5"], "8n", now + 0.15);
+                    synth.triggerAttackRelease(["G4", "C5", "E5"], "4n", now + 0.3);
+                } else if (type === 'lose') {
+                    synth.triggerAttackRelease(["G4", "Eb4", "C4"], "4n", now);
+                } else if (type === 'click') {
+                    padSynth.triggerAttackRelease("A5", "32n", now);
+                }
+            } catch (e) {}
+        }
+
+        /**************************************************************
+         * GAME CONFIGURATION & STATE
+         **************************************************************/
+        const TRACK_WIDTH = 14;
+        let TRACK_LENGTH = 850;
+        const NUM_BOTS = 6;
+
+        const COLORS = {
+            navyOutline: 0x161e31,
+            trackSurface: 0x161e31,     // Dark navy track surface from Reference 2
+            sandFloor: 0xf6be85,        // Warm peach/tan surrounding floor from Reference 2
+            whiteLine: 0xffffff,
+            boostCyan: 0x38bdf8,
+            obstaclePink: 0xf43f5e,
+            cactusGreen: 0x84cc16,
+            gold: 0xfacc15
+        };
+
+        const RACER_PALETTES = [
+            { name: "YOU", shirt: 0xa3e635, helmet: 0xffffff, shorts: 0x15803d, isPlayer: true },
+            { name: "Bot Red", shirt: 0xef4444, helmet: 0xfca5a5, shorts: 0x7f1d1d },
+            { name: "Bot Blue", shirt: 0x3b82f6, helmet: 0x93c5fd, shorts: 0x1e3a8a },
+            { name: "Bot Gold", shirt: 0xfacc15, helmet: 0xfef08a, shorts: 0x854d0e },
+            { name: "Bot Pink", shirt: 0xec4899, helmet: 0xf9a8d4, shorts: 0x831843 },
+            { name: "Bot Cyan", shirt: 0x06b6d4, helmet: 0x67e8f9, shorts: 0x164e63 },
+            { name: "Bot Purple", shirt: 0xa855f7, helmet: 0xd8b4fe, shorts: 0x581c87 }
+        ];
+
+        let state = {
+            level: 1,
+            mode: 'racing', // 'racing', 'paused', 'finished'
+            botDifficulty: 1, // 0: Easy, 1: Normal, 2: Pro
+            camMode: 0,       // 0: Chase, 1: High Action
+            steerInput: 0,
+            targetX: 0,
+            isDragging: false,
+            pointerStartX: 0,
+            playerStartX: 0
+        };
+
+        /**************************************************************
+         * THREE.JS SCENE & CARTOON GRAPHICS ENGINE
+         **************************************************************/
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 450);
+
+        // Crisp Cartoon Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.65);
+        dirLight.position.set(35, 80, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 220;
+        const d = 35;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // Helper: Creates a mesh with an inverted-hull cartoon dark navy outline
+        const outlineMat = new THREE.MeshBasicMaterial({
+            color: COLORS.navyOutline,
+            side: THREE.BackSide
+        });
+
+        function createCartoonMesh(geometry, colorHex, outlineThickness = 0.08, castShadow = true) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshLambertMaterial({ color: colorHex });
+            const mesh = new THREE.Mesh(geometry, mat);
+            mesh.castShadow = castShadow;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+
+            if (outlineThickness > 0) {
+                const outline = new THREE.Mesh(geometry, outlineMat);
+                outline.scale.set(
+                    1 + outlineThickness,
+                    1 + outlineThickness,
+                    1 + outlineThickness
+                );
+                group.add(outline);
+            }
+            return group;
+        }
+
+        // Dynamic World Containers
+        const trackGroup = new THREE.Group();
+        scene.add(trackGroup);
+
+        let boostPads = [];
+        let obstacles = [];
+        let sceneryItems = [];
+        let confettiParticles = [];
+        let racers = [];
+
+        /**************************************************************
+         * TRACK, PROPS & FINISH ARCH BUILDER
+         **************************************************************/
+        function buildTrack() {
+            // Clear existing track objects
+            while (trackGroup.children.length > 0) {
+                trackGroup.remove(trackGroup.children[0]);
+            }
+            boostPads = [];
+            obstacles = [];
+            sceneryItems = [];
+            confettiParticles = [];
+
+            TRACK_LENGTH = 780 + (state.level - 1) * 120;
+
+            // 1. Warm Peach/Tan Ground Table (Matches Reference 2)
+            const sandGeo = new THREE.PlaneGeometry(500, TRACK_LENGTH + 400);
+            const sandMat = new THREE.MeshLambertMaterial({ color: COLORS.sandFloor });
+            const sandMesh = new THREE.Mesh(sandGeo, sandMat);
+            sandMesh.rotation.x = -Math.PI / 2;
+            sandMesh.position.set(0, -0.15, -TRACK_LENGTH / 2 + 40);
+            sandMesh.receiveShadow = true;
+            trackGroup.add(sandMesh);
+
+            // Top Horizon Border Line (Separating Tan Floor & Green Wall like Reference 2)
+            const horizonWallBorder = new THREE.Mesh(
+                new THREE.BoxGeometry(500, 0.4, 1.5),
+                new THREE.MeshBasicMaterial({ color: 0xb48a5a })
+            );
+            horizonWallBorder.position.set(0, 0, -TRACK_LENGTH - 90);
+            trackGroup.add(horizonWallBorder);
+
+            // 2. Crisp Dark Navy Track Board with White Borders (Matches Cup Pong Table Style)
+            const outerBoardGeo = new THREE.BoxGeometry(TRACK_WIDTH + 1.4, 0.22, TRACK_LENGTH + 60);
+            const outerBoardMat = new THREE.MeshBasicMaterial({ color: COLORS.navyOutline });
+            const outerBoard = new THREE.Mesh(outerBoardGeo, outerBoardMat);
+            outerBoard.position.set(0, -0.08, -TRACK_LENGTH / 2 + 10);
+            trackGroup.add(outerBoard);
+
+            const whiteTrimGeo = new THREE.BoxGeometry(TRACK_WIDTH + 0.7, 0.24, TRACK_LENGTH + 59);
+            const whiteTrimMat = new THREE.MeshBasicMaterial({ color: COLORS.whiteLine });
+            const whiteTrim = new THREE.Mesh(whiteTrimGeo, whiteTrimMat);
+            whiteTrim.position.set(0, -0.06, -TRACK_LENGTH / 2 + 10);
+            trackGroup.add(whiteTrim);
+
+            const innerRoadGeo = new THREE.BoxGeometry(TRACK_WIDTH - 0.2, 0.26, TRACK_LENGTH + 58);
+            const innerRoadMat = new THREE.MeshLambertMaterial({ color: COLORS.trackSurface });
+            const innerRoad = new THREE.Mesh(innerRoadGeo, innerRoadMat);
+            innerRoad.position.set(0, -0.04, -TRACK_LENGTH / 2 + 10);
+            innerRoad.receiveShadow = true;
+            trackGroup.add(innerRoad);
+
+            // Center White Racing Line (Matches Reference 2 center table stripe)
+            const centerStripeGeo = new THREE.PlaneGeometry(0.38, TRACK_LENGTH);
+            const centerStripeMat = new THREE.MeshBasicMaterial({ color: COLORS.whiteLine });
+            const centerStripe = new THREE.Mesh(centerStripeGeo, centerStripeMat);
+            centerStripe.rotation.x = -Math.PI / 2;
+            centerStripe.position.set(0, 0.11, -TRACK_LENGTH / 2);
+            trackGroup.add(centerStripe);
+
+            // 3. Spawn Boost Pads & Obstacles along the track
+            const numSegments = Math.floor(TRACK_LENGTH / 32);
+            for (let i = 2; i < numSegments - 1; i++) {
+                const zPos = -i * 32;
+
+                // Cyan Speed Boost Pad
+                if (i % 2 === 0 || Math.random() < 0.45) {
+                    const padX = (Math.random() - 0.5) * (TRACK_WIDTH - 3.5);
+                    const padGroup = new THREE.Group();
+
+                    const padBase = createCartoonMesh(
+                        new THREE.BoxGeometry(2.4, 0.12, 4.2),
+                        COLORS.boostCyan,
+                        0.06,
+                        false
+                    );
+                    padGroup.add(padBase);
+
+                    // White Chevron Stripe on Pad
+                    const chevron = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.4, 0.16, 1.2),
+                        new THREE.MeshBasicMaterial({ color: 0xffffff })
+                    );
+                    padGroup.add(chevron);
+
+                    padGroup.position.set(padX, 0.1, zPos);
+                    trackGroup.add(padGroup);
+                    boostPads.push({ mesh: padGroup, x: padX, z: zPos, width: 2.3, length: 4.2 });
+                }
+
+                // Cartoon Cup / Barrier Obstacles (Inspired by Cup Pong Cups & Western Barrels)
+                const numObs = Math.random() < 0.45 ? 2 : 1;
+                for (let j = 0; j < numObs; j++) {
+                    const obsX = (Math.random() - 0.5) * (TRACK_WIDTH - 2.6);
+                    const obsZ = zPos - 14 + (Math.random() - 0.5) * 6;
+
+                    const cupGroup = createCartoonCupObstacle(j % 2 === 0 ? 0x84cc16 : 0xf43f5e);
+                    cupGroup.position.set(obsX, 0.1, obsZ);
+                    trackGroup.add(cupGroup);
+
+                    obstacles.push({
+                        mesh: cupGroup,
+                        x: obsX,
+                        z: obsZ,
+                        radius: 0.85,
+                        hit: false
+                    });
+                }
+            }
+
+            // 4. Cartoon Desert Cacti & Western Props on the Tan Floor (From Reference 1 + Reference 2 Style)
+            for (let z = -15; z > -TRACK_LENGTH - 30; z -= 22) {
+                [-1, 1].forEach(side => {
+                    const xOffset = side * (TRACK_WIDTH / 2 + 4 + Math.random() * 14);
+                    if (Math.random() < 0.65) {
+                        const cactus = createCartoonCactus();
+                        cactus.position.set(xOffset, 0, z + (Math.random() - 0.5) * 10);
+                        const s = 0.85 + Math.random() * 0.5;
+                        cactus.scale.set(s, s, s);
+                        trackGroup.add(cactus);
+                    } else {
+                        const house = createCartoonWesternBuilding();
+                        house.position.set(side * (TRACK_WIDTH / 2 + 12 + Math.random() * 8), 0, z);
+                        house.rotation.y = side > 0 ? -0.25 : 0.25;
+                        trackGroup.add(house);
+                    }
+                });
+            }
+
+            // 5. Checkered Finish Arch (From Reference 1)
+            const finishArch = createFinishArch();
+            finishArch.position.set(0, 0, -TRACK_LENGTH);
+            trackGroup.add(finishArch);
+        }
+
+        // Builds a stylized cartoon Cup/Bumper obstacle like the green/white cups in Reference 2
+        function createCartoonCupObstacle(colorHex) {
+            const group = new THREE.Group();
+            const cupGeo = new THREE.CylinderGeometry(0.75, 0.52, 1.45, 14);
+            const cupMesh = createCartoonMesh(cupGeo, colorHex, 0.09, true);
+            cupMesh.position.y = 0.72;
+            group.add(cupMesh);
+
+            // White Rim
+            const rimGeo = new THREE.TorusGeometry(0.75, 0.11, 8, 16);
+            const rimMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const rim = new THREE.Mesh(rimGeo, rimMat);
+            rim.rotation.x = Math.PI / 2;
+            rim.position.y = 1.45;
+            group.add(rim);
+
+            return group;
+        }
+
+        function createCartoonCactus() {
+            const group = new THREE.Group();
+            const trunk = createCartoonMesh(new THREE.CylinderGeometry(0.45, 0.55, 3.6, 10), COLORS.cactusGreen, 0.08);
+            trunk.position.y = 1.8;
+            group.add(trunk);
+
+            const armL = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.3, 1.4, 8), COLORS.cactusGreen, 0.08);
+            armL.position.set(-0.75, 2.2, 0);
+            armL.rotation.z = Math.PI / 4;
+            group.add(armL);
+
+            const armR = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.3, 1.3, 8), COLORS.cactusGreen, 0.08);
+            armR.position.set(0.75, 1.8, 0);
+            armR.rotation.z = -Math.PI / 4;
+            group.add(armR);
+
+            return group;
+        }
+
+        function createCartoonWesternBuilding() {
+            const group = new THREE.Group();
+            const body = createCartoonMesh(new THREE.BoxGeometry(5.5, 4.2, 4.5), 0xfef3c7, 0.05);
+            body.position.y = 2.1;
+            group.add(body);
+
+            const roof = createCartoonMesh(new THREE.ConeGeometry(4.3, 2.2, 4), 0xb45309, 0.06);
+            roof.position.y = 5.3;
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+
+            return group;
+        }
+
+        function createFinishArch() {
+            const arch = new THREE.Group();
+            const pillarGeo = new THREE.BoxGeometry(1.5, 8.5, 1.5);
+            const leftPillar = createCartoonMesh(pillarGeo, 0xffffff, 0.06);
+            leftPillar.position.set(-TRACK_WIDTH / 2 + 0.5, 4.25, 0);
+            arch.add(leftPillar);
+
+            const rightPillar = createCartoonMesh(pillarGeo, 0xffffff, 0.06);
+            rightPillar.position.set(TRACK_WIDTH / 2 - 0.5, 4.25, 0);
+            arch.add(rightPillar);
+
+            // Checkered blocks on pillars
+            for (let y = 1; y < 8; y += 1.4) {
+                const blockL = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 1.6), new THREE.MeshBasicMaterial({ color: COLORS.navyOutline }));
+                blockL.position.set(-TRACK_WIDTH / 2 + 0.5, y, 0);
+                arch.add(blockL);
+
+                const blockR = blockL.clone();
+                blockR.position.set(TRACK_WIDTH / 2 - 0.5, y, 0);
+                arch.add(blockR);
+            }
+
+            // Top Banner
+            const banner = createCartoonMesh(new THREE.BoxGeometry(TRACK_WIDTH + 2, 2.2, 1.6), 0xfacc15, 0.05);
+            banner.position.set(0, 8.2, 0);
+            arch.add(banner);
+
+            // Ground Checkered Strip
+            const finishLine = new THREE.Mesh(
+                new THREE.PlaneGeometry(TRACK_WIDTH, 2.2),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
+            );
+            finishLine.rotation.x = -Math.PI / 2;
+            finishLine.position.set(0, 0.14, 0);
+            arch.add(finishLine);
+
+            return arch;
+        }
+
+        /**************************************************************
+         * 3D CARTOON CYCLIST BUILDER
+         **************************************************************/
+        function createCyclistMesh(palette) {
+            const root = new THREE.Group();
+
+            // 1. Wheels
+            const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.22, 16);
+            wheelGeo.rotateZ(Math.PI / 2);
+
+            const backWheel = createCartoonMesh(wheelGeo, 0x334155, 0.12);
+            backWheel.position.set(0, 0.55, 0.75);
+            root.add(backWheel);
+
+            const frontWheel = createCartoonMesh(wheelGeo, 0x334155, 0.12);
+            frontWheel.position.set(0, 0.55, -0.75);
+            root.add(frontWheel);
+
+            // 2. Bike Frame
+            const frameBar = createCartoonMesh(new THREE.BoxGeometry(0.18, 0.18, 1.5), 0xffffff, 0.12);
+            frameBar.position.set(0, 0.85, 0);
+            root.add(frameBar);
+
+            // Handlebars
+            const handleBar = createCartoonMesh(new THREE.BoxGeometry(1.15, 0.14, 0.14), COLORS.navyOutline, 0);
+            handleBar.position.set(0, 1.48, -0.58);
+            root.add(handleBar);
+
+            // 3. Rider Body (T-shirt torso like Reference 1 with Cartoon Outline)
+            const torsoGroup = new THREE.Group();
+            torsoGroup.position.set(0, 1.65, 0.15);
+            torsoGroup.rotation.x = -0.32; // Leaning forward
+            root.add(torsoGroup);
+
+            const torso = createCartoonMesh(new THREE.CylinderGeometry(0.38, 0.3, 1.05, 12), palette.shirt, 0.1);
+            torsoGroup.add(torso);
+
+            // Shorts / Hips
+            const hips = createCartoonMesh(new THREE.SphereGeometry(0.34, 10, 10), palette.shorts, 0.1);
+            hips.position.set(0, -0.52, 0);
+            torsoGroup.add(hips);
+
+            // Head & Helmet
+            const head = createCartoonMesh(new THREE.SphereGeometry(0.34, 12, 12), palette.helmet, 0.12);
+            head.position.set(0, 0.82, -0.05);
+            torsoGroup.add(head);
+
+            // Arms
+            const armGeo = new THREE.CylinderGeometry(0.11, 0.1, 0.75, 8);
+            const leftArm = createCartoonMesh(armGeo, palette.shirt, 0.12);
+            leftArm.position.set(-0.42, 0.18, -0.35);
+            leftArm.rotation.x = Math.PI / 3;
+            torsoGroup.add(leftArm);
+
+            const rightArm = createCartoonMesh(armGeo, palette.shirt, 0.12);
+            rightArm.position.set(0.42, 0.18, -0.35);
+            rightArm.rotation.x = Math.PI / 3;
+            torsoGroup.add(rightArm);
+
+            // 4. Animated Pedaling Legs
+            const legGeo = new THREE.CylinderGeometry(0.13, 0.11, 0.75, 8);
+            const leftLeg = createCartoonMesh(legGeo, palette.shorts, 0.12);
+            leftLeg.position.set(-0.26, 0.85, 0.15);
+            root.add(leftLeg);
+
+            const rightLeg = createCartoonMesh(legGeo, palette.shorts, 0.12);
+            rightLeg.position.set(0.26, 0.85, 0.15);
+            root.add(rightLeg);
+
+            return {
+                root,
+                torsoGroup,
+                leftLeg,
+                rightLeg,
+                backWheel,
+                frontWheel
+            };
+        }
+
+        /**************************************************************
+         * RACER SPAWNING & LABELS
+         **************************************************************/
+        const labelsContainer = document.getElementById('labels-container');
+
+        function spawnRacers() {
+            // Remove old racers
+            racers.forEach(r => scene.remove(r.rig.root));
+            racers = [];
+            labelsContainer.innerHTML = '';
+
+            // Create Player + 6 Bots
+            for (let i = 0; i <= NUM_BOTS; i++) {
+                const palette = RACER_PALETTES[i];
+                const rig = createCyclistMesh(palette);
+
+                // Starting grid arrangement: Player starts at back (7th) like Reference 1
+                const isPlayer = i === 0;
+                const row = isPlayer ? 0 : Math.floor((i - 1) / 2) + 1;
+                const col = isPlayer ? 0 : ((i % 2 === 0 ? 1 : -1) * (2.4 + (row % 2) * 1.1));
+                const startZ = -row * 8.5;
+
+                rig.root.position.set(col, 0, startZ);
+                scene.add(rig.root);
+
+                // Floating HTML Rank Label above each cyclist
+                const labelEl = document.createElement('div');
+                labelEl.className = `racer-label ${isPlayer ? 'player-label' : ''}`;
+                labelEl.textContent = '7th';
+                labelsContainer.appendChild(labelEl);
+
+                // Base speeds tuned so player can overtake with good steering & boost pads
+                const diffMultiplier = state.botDifficulty === 0 ? 0.91 : (state.botDifficulty === 1 ? 0.97 : 1.02);
+                const baseSpeed = isPlayer
+                    ? 29.5
+                    : (26.8 + Math.random() * 3.8) * diffMultiplier;
+
+                racers.push({
+                    id: i,
+                    isPlayer,
+                    name: palette.name,
+                    rig,
+                    labelEl,
+                    x: col,
+                    z: startZ,
+                    vx: 0,
+                    speed: baseSpeed,
+                    baseSpeed: baseSpeed,
+                    boostTimer: 0,
+                    stumbleTimer: 0,
+                    pedalPhase: Math.random() * Math.PI * 2,
+                    aiTargetX: col,
+                    aiTimer: Math.random() * 1.5,
+                    rank: 7,
+                    finished: false
+                });
+            }
+
+            state.targetX = 0;
+        }
+
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        /**************************************************************
+         * INPUT HANDLING (Phone Touch Drag + Mouse + Keyboard)
+         **************************************************************/
+        const keys = { left: false, right: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        function onPointerDown(clientX) {
+            initAudio();
+            if (state.mode !== 'racing') return;
+            state.isDragging = true;
+            state.pointerStartX = clientX;
+            const player = racers[0];
+            if (player) state.playerStartX = player.x;
+
+            // Fade out the helper prompt once player starts steering
+            const prompt = document.getElementById('steer-prompt');
+            if (prompt) prompt.style.opacity = '0';
+        }
+
+        function onPointerMove(clientX) {
+            if (!state.isDragging || state.mode !== 'racing') return;
+            const deltaNorm = (clientX - state.pointerStartX) / Math.min(window.innerWidth, 500);
+            const limit = TRACK_WIDTH / 2 - 1.1;
+            state.targetX = Math.max(-limit, Math.min(limit, state.playerStartX + deltaNorm * (TRACK_WIDTH * 1.15)));
+        }
+
+        function onPointerUp() {
+            state.isDragging = false;
+        }
+
+        canvas.addEventListener('mousedown', e => onPointerDown(e.clientX));
+        window.addEventListener('mousemove', e => onPointerMove(e.clientX));
+        window.addEventListener('mouseup', onPointerUp);
+
+        canvas.addEventListener('touchstart', e => {
+            if (e.touches.length > 0) onPointerDown(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchmove', e => {
+            if (e.touches.length > 0) onPointerMove(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchend', onPointerUp);
+
+        /**************************************************************
+         * GAME LOOP & PHYSICS UPDATE
+         **************************************************************/
+        const clock = new THREE.Clock();
+        const projVec = new THREE.Vector3();
+
+        function spawnVictoryConfetti(zPos) {
+            const colors = [0xf43f5e, 0xfacc15, 0x38bdf8, 0x84cc16, 0xa855f7];
+            for (let i = 0; i < 55; i++) {
+                const mat = new THREE.MeshBasicMaterial({
+                    color: colors[i % colors.length],
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.45), mat);
+                mesh.position.set(
+                    (Math.random() - 0.5) * TRACK_WIDTH,
+                    5 + Math.random() * 5,
+                    zPos + (Math.random() - 0.5) * 8
+                );
+                trackGroup.add(mesh);
+                confettiParticles.push({
+                    mesh,
+                    vy: -2 - Math.random() * 3,
+                    vx: (Math.random() - 0.5) * 4,
+                    vr: (Math.random() - 0.5) * 6
+                });
+            }
+        }
+
+        function updateGame(dt) {
+            if (state.mode !== 'racing') return;
+
+            const player = racers[0];
+            const trackLimit = TRACK_WIDTH / 2 - 1.05;
+
+            // Keyboard steering support
+            if (keys.left) {
+                state.targetX = Math.max(-trackLimit, state.targetX - 16 * dt);
+                document.getElementById('steer-prompt').style.opacity = '0';
+            }
+            if (keys.right) {
+                state.targetX = Math.min(trackLimit, state.targetX + 16 * dt);
+                document.getElementById('steer-prompt').style.opacity = '0';
+            }
+
+            // Update all cyclists
+            racers.forEach(r => {
+                // Boost & Stumble timers
+                if (r.boostTimer > 0) r.boostTimer -= dt;
+                if (r.stumbleTimer > 0) r.stumbleTimer -= dt;
+
+                let targetSpeed = r.baseSpeed;
+                if (r.boostTimer > 0) targetSpeed *= 1.42;
+                if (r.stumbleTimer > 0) targetSpeed *= 0.48;
+
+                // Subtle rubber-banding for exciting pack racing
+                if (!r.isPlayer && player) {
+                    const distToPlayer = player.z - r.z; // positive if bot is ahead
+                    if (distToPlayer > 35) targetSpeed *= 0.92;
+                    else if (distToPlayer < -30) targetSpeed *= 1.08;
+                }
+
+                r.speed += (targetSpeed - r.speed) * 6 * dt;
+
+                // Lateral Steering
+                let prevX = r.x;
+                if (r.isPlayer) {
+                    r.x += (state.targetX - r.x) * 12 * dt;
+                } else {
+                    r.aiTimer -= dt;
+                    if (r.aiTimer <= 0) {
+                        r.aiTimer = 0.6 + Math.random() * 1.1;
+                        // Look ahead for obstacles to dodge or boost pads to grab
+                        let desiredX = (Math.random() - 0.5) * (TRACK_WIDTH - 3);
+                        for (let pad of boostPads) {
+                            if (pad.z < r.z && pad.z > r.z - 35) {
+                                desiredX = pad.x;
+                                break;
+                            }
+                        }
+                        for (let obs of obstacles) {
+                            if (obs.z < r.z && obs.z > r.z - 22 && Math.abs(obs.x - desiredX) < 1.6) {
+                                desiredX = obs.x > 0 ? obs.x - 2.5 : obs.x + 2.5;
+                            }
+                        }
+                        r.aiTargetX = Math.max(-trackLimit, Math.min(trackLimit, desiredX));
+                    }
+                    r.x += (r.aiTargetX - r.x) * 4.5 * dt;
+                }
+
+                r.x = Math.max(-trackLimit, Math.min(trackLimit, r.x));
+                r.vx = (r.x - prevX) / Math.max(dt, 0.001);
+
+                // Move forward along -Z
+                r.z -= r.speed * dt;
+
+                // Update 3D Transform & Bike Lean
+                r.rig.root.position.set(r.x, 0, r.z);
+                const leanAngle = THREE.MathUtils.clamp(-r.vx * 0.045, -0.38, 0.38);
+                r.rig.root.rotation.z = leanAngle;
+                r.rig.root.rotation.y = leanAngle * 0.35;
+
+                // Pedaling Animation
+                r.pedalPhase += r.speed * dt * 0.85;
+                r.rig.leftLeg.position.y = 0.82 + Math.sin(r.pedalPhase) * 0.22;
+                r.rig.rightLeg.position.y = 0.82 + Math.sin(r.pedalPhase + Math.PI) * 0.22;
+                r.rig.torsoGroup.rotation.z = Math.sin(r.pedalPhase) * 0.06;
+
+                // Check Boost Pads
+                for (let pad of boostPads) {
+                    if (Math.abs(r.z - pad.z) < pad.length / 2 && Math.abs(r.x - pad.x) < pad.width / 2 + 0.4) {
+                        if (r.boostTimer <= 0.1) {
+                            r.boostTimer = 1.35;
+                            if (r.isPlayer) playSound('boost');
+                        }
+                    }
+                }
+
+                // Check Cup Obstacles
+                for (let obs of obstacles) {
+                    if (!obs.hit && Math.abs(r.z - obs.z) < 1.1 && Math.abs(r.x - obs.x) < obs.radius + 0.45) {
+                        obs.hit = true;
+                        r.stumbleTimer = 0.65;
+                        r.boostTimer = 0;
+                        // Knock cup flying!
+                        obs.mesh.position.y = 1.5;
+                        obs.mesh.rotation.x = 1.2;
+                        obs.mesh.rotation.z = (Math.random() - 0.5) * 2;
+                        if (r.isPlayer) playSound('bump');
+                    }
+                }
+            });
+
+            // Rider-to-Rider Side Bump Physics
+            for (let i = 0; i < racers.length; i++) {
+                for (let j = i + 1; j < racers.length; j++) {
+                    const a = racers[i];
+                    const b = racers[j];
+                    if (Math.abs(a.z - b.z) < 1.9 && Math.abs(a.x - b.x) < 1.15) {
+                        const push = a.x < b.x ? -0.18 : 0.18;
+                        a.x = Math.max(-trackLimit, Math.min(trackLimit, a.x + push));
+                        b.x = Math.max(-trackLimit, Math.min(trackLimit, b.x - push));
+                        if (a.isPlayer || b.isPlayer) {
+                            state.targetX = racers[0].x;
+                        }
+                    }
+                }
+            }
+
+            // Sort Racers by Z to Compute Live Rankings
+            const sorted = [...racers].sort((a, b) => a.z - b.z);
+            sorted.forEach((r, idx) => {
+                r.rank = idx + 1;
+                r.labelEl.textContent = getOrdinal(r.rank);
+            });
+
+            // Update Player HUD
+            if (player) {
+                const ord = getOrdinal(player.rank);
+                document.getElementById('hud-rank-top').textContent = ord;
+                document.getElementById('big-rank-display').textContent = ord;
+
+                const progress = THREE.MathUtils.clamp(Math.abs(player.z) / TRACK_LENGTH, 0, 1);
+                document.getElementById('progress-fill').style.width = `${(progress * 100).toFixed(1)}%`;
+
+                // Boost overlay effect
+                document.getElementById('boost-overlay').style.opacity = player.boostTimer > 0 ? '1' : '0';
+
+                // Dynamic Camera Chase
+                const camHeight = state.camMode === 0 ? 5.6 : 8.5;
+                const camDist = state.camMode === 0 ? 10.2 : 13.5;
+                const targetFov = player.boostTimer > 0 ? 66 : 58;
+                camera.fov += (targetFov - camera.fov) * 6 * dt;
+                camera.updateProjectionMatrix();
+
+                camera.position.x += (player.x * 0.55 - camera.position.x) * 8 * dt;
+                camera.position.y += (camHeight - camera.position.y) * 6 * dt;
+                camera.position.z = player.z + camDist;
+                camera.lookAt(player.x * 0.3, 1.4, player.z - 14);
+
+                // Move Directional Light with player so shadows stay crisp
+                dirLight.position.set(player.x + 25, 60, player.z + 30);
+                dirLight.target.position.set(player.x, 0, player.z - 15);
+                dirLight.target.updateMatrixWorld();
+
+                // Check Finish Line!
+                if (player.z <= -TRACK_LENGTH) {
+                    finishRace(player.rank);
+                }
+            }
+
+            // Animate Confetti if any
+            confettiParticles.forEach(p => {
+                p.mesh.position.y += p.vy * dt;
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.rotation.x += p.vr * dt;
+                p.mesh.rotation.y += p.vr * dt;
+            });
+        }
+
+        function updateFloatingLabels() {
+            const halfW = window.innerWidth / 2;
+            const halfH = window.innerHeight / 2;
+
+            racers.forEach(r => {
+                projVec.set(r.x, 3.15, r.z);
+                projVec.project(camera);
+
+                if (projVec.z > 1 || projVec.z < -1) {
+                    r.labelEl.style.opacity = '0';
+                    return;
+                }
+
+                const screenX = (projVec.x * halfW) + halfW;
+                const screenY = -(projVec.y * halfH) + halfH;
+
+                r.labelEl.style.opacity = '1';
+                r.labelEl.style.left = `${screenX}px`;
+                r.labelEl.style.top = `${screenY}px`;
+            });
+        }
+
+        /**************************************************************
+         * RACE COMPLETION & UI CONTROLS
+         **************************************************************/
+        function finishRace(finalRank) {
+            state.mode = 'finished';
+            document.getElementById('boost-overlay').style.opacity = '0';
+            spawnVictoryConfetti(-TRACK_LENGTH);
+
+            const modal = document.getElementById('game-modal');
+            const badge = document.getElementById('modal-badge');
+            const title = document.getElementById('modal-title');
+            const desc = document.getElementById('modal-desc');
+            const nextBtn = document.getElementById('btn-next');
+
+            modal.classList.remove('hidden');
+            title.textContent = `${getOrdinal(finalRank)} Place!`;
+
+            if (finalRank === 1) {
+                playSound('win');
+                badge.textContent = '🏆 CHAMPION!';
+                badge.className = 'inline-block bg-[#facc15] text-[#161e31] border-[3px] border-[#161e31] px-4 py-1 rounded-full font-extrabold text-sm mb-2 shadow-[0_3px_0_#161e31]';
+                desc.textContent = `Awesome riding! You conquered Level ${state.level} in 1st place!`;
+                nextBtn.classList.remove('hidden');
+            } else if (finalRank <= 3) {
+                playSound('win');
+                badge.textContent = '🥈 PODIUM FINISH!';
+                badge.className = 'inline-block bg-[#38bdf8] text-white border-[3px] border-[#161e31] px-4 py-1 rounded-full font-extrabold text-sm mb-2 shadow-[0_3px_0_#161e31]';
+                desc.textContent = `Great podium finish! Ready for the next track?`;
+                nextBtn.classList.remove('hidden');
+            } else {
+                playSound('lose');
+                badge.textContent = 'KEEP PEDALING!';
+                badge.className = 'inline-block bg-[#f43f5e] text-white border-[3px] border-[#161e31] px-4 py-1 rounded-full font-extrabold text-sm mb-2 shadow-[0_3px_0_#161e31]';
+                desc.textContent = `Hit the blue boost pads and dodge the cups to reach the podium!`;
+                nextBtn.classList.add('hidden');
+            }
+        }
+
+        function startLevel(lvl) {
+            state.level = lvl;
+            state.mode = 'racing';
+            document.getElementById('hud-level').textContent = state.level;
+            document.getElementById('level-badge').textContent = state.level;
+            document.getElementById('game-modal').classList.add('hidden');
+            document.getElementById('btn-pause').textContent = 'PAUSE';
+            document.getElementById('steer-prompt').style.opacity = '1';
+
+            buildTrack();
+            spawnRacers();
+        }
+
+        // UI Button Listeners
+        document.getElementById('btn-retry').addEventListener('click', () => {
+            playSound('click');
+            startLevel(state.level);
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            playSound('click');
+            startLevel(state.level + 1);
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            initAudio();
+            playSound('click');
+            if (state.mode === 'racing') {
+                state.mode = 'paused';
+                document.getElementById('btn-pause').textContent = 'RESUME';
+                const modal = document.getElementById('game-modal');
+                document.getElementById('modal-badge').textContent = 'GAME PAUSED';
+                document.getElementById('modal-title').textContent = `Level ${state.level}`;
+                document.getElementById('modal-desc').textContent = 'Take a breather or restart the track anytime.';
+                document.getElementById('btn-next').classList.add('hidden');
+                modal.classList.remove('hidden');
+            } else if (state.mode === 'paused') {
+                state.mode = 'racing';
+                document.getElementById('btn-pause').textContent = 'PAUSE';
+                document.getElementById('game-modal').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+            document.getElementById('sound-text').textContent = soundEnabled ? 'Sound' : 'Muted';
+            if (soundEnabled) playSound('click');
+        });
+
+        document.getElementById('btn-bot-mode').addEventListener('click', () => {
+            initAudio();
+            playSound('click');
+            state.botDifficulty = (state.botDifficulty + 1) % 3;
+            const labels = ['vs 6 Bots: Easy', 'vs 6 Bots: Normal', 'vs 6 Bots: Pro'];
+            document.getElementById('bot-text').textContent = labels[state.botDifficulty];
+            startLevel(state.level);
+        });
+
+        document.getElementById('btn-cam').addEventListener('click', () => {
+            initAudio();
+            playSound('click');
+            state.camMode = (state.camMode + 1) % 2;
+            document.getElementById('cam-text').textContent = state.camMode === 0 ? 'Cam: Chase' : 'Cam: High';
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        /**************************************************************
+         * INITIALIZE & START ANIMATION LOOP
+         **************************************************************/
+        window.onload = function () {
+            startLevel(1);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const dt = Math.min(clock.getDelta(), 0.05);
+                updateGame(dt);
+                renderer.render(scene, camera);
+                updateFloatingLabels();
+            }
+
+            animate();
+        };
+    </script>
+</body>
+</html>
