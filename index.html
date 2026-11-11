@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cycle Dash!</title>
+    <title>Cycle Racing</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -21,16 +21,16 @@
             height: 100%;
             overflow: hidden;
             font-family: 'Fredoka', sans-serif;
-            background-color: #84cc16;
+            background-color: #a3e635;
         }
-        /* Cartoon Striped Background like Reference Image 2 */
+        /* Bright Cartoon Striped Background */
         .striped-bg {
             background: repeating-linear-gradient(
                 105deg,
-                #84cc16,
+                #a3e635,
+                #a3e635 45px,
                 #84cc16 45px,
-                #65a30d 45px,
-                #65a30d 90px
+                #84cc16 90px
             );
         }
         /* Thick Dark Navy Outlines & Drop Shadows */
@@ -67,6 +67,40 @@
             box-shadow: 0px 8px 0px #161e31;
             border-radius: 28px;
         }
+        /* Chunky Start Match Button */
+        .start-match-btn {
+            background: linear-gradient(180deg, #fde047 0%, #facc15 55%, #eab308 100%);
+            border: 5px solid #161e31;
+            box-shadow: 0px 8px 0px #161e31, inset 0px 4px 0px rgba(255, 255, 255, 0.65);
+            border-radius: 9999px;
+            color: #ffffff;
+            -webkit-text-stroke: 5px #161e31;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 3px 0px rgba(22, 30, 49, 0.25));
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+            animation: pulseBounce 1.8s infinite ease-in-out;
+        }
+        .start-match-btn:hover {
+            background: linear-gradient(180deg, #fef08a 0%, #fde047 55%, #facc15 100%);
+            transform: scale(1.04) translateY(-2px);
+            box-shadow: 0px 10px 0px #161e31, inset 0px 4px 0px rgba(255, 255, 255, 0.8);
+        }
+        .start-match-btn:active {
+            transform: scale(0.98) translateY(5px);
+            box-shadow: 0px 3px 0px #161e31;
+            animation: none;
+        }
+        @keyframes pulseBounce {
+            0%, 100% {
+                transform: translateY(0) scale(1);
+            }
+            50% {
+                transform: translateY(-6px) scale(1.04);
+            }
+        }
         /* Floating 3D Rank Labels */
         .racer-label {
             position: absolute;
@@ -97,6 +131,19 @@
             background-position: 0 0, 0 6px, 6px -6px, -6px 0;
             background-color: #ffffff;
         }
+        /* Anime Radial Speed Lines Overlay for Boost */
+        .speed-lines-overlay {
+            background: 
+                radial-gradient(circle, transparent 48%, rgba(56, 189, 248, 0.28) 85%, rgba(250, 204, 21, 0.35) 100%),
+                repeating-conic-gradient(
+                    from 0deg,
+                    transparent 0deg 4deg,
+                    rgba(255, 255, 255, 0.22) 4deg 5.2deg,
+                    transparent 5.2deg 11deg
+                );
+            mask-image: radial-gradient(circle, transparent 46%, black 78%);
+            -webkit-mask-image: radial-gradient(circle, transparent 46%, black 78%);
+        }
         #game-canvas {
             position: absolute;
             top: 0;
@@ -116,8 +163,7 @@
     <div id="labels-container" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
 
     <!-- Speed Lines Overlay -->
-    <div id="boost-overlay" class="absolute inset-0 pointer-events-none z-10 opacity-0 transition-opacity duration-200"
-         style="background: radial-gradient(circle, transparent 55%, rgba(56, 189, 248, 0.35) 100%);"></div>
+    <div id="boost-overlay" class="speed-lines-overlay absolute inset-0 pointer-events-none z-10 opacity-0 transition-opacity duration-150"></div>
 
     <!-- HUD / UI Overlay -->
     <div class="relative z-20 flex flex-col justify-between w-full h-full p-3 sm:p-5 pointer-events-none">
@@ -134,7 +180,7 @@
             <!-- Center Title & Progress Bar -->
             <div class="flex flex-col items-center">
                 <h1 id="main-title" class="cartoon-title text-4xl sm:text-6xl tracking-wide transition-all duration-300">
-                    Cycle Dash
+                    Cycle Racing
                 </h1>
 
                 <!-- Level Progress Bar (Matches First Image Pink Progress Bar + Cartoon Outline) -->
@@ -155,15 +201,29 @@
             </div>
 
             <!-- Right Pill: Pause / Restart -->
-            <button id="btn-pause" class="cartoon-pill px-4 py-1.5 text-sm sm:text-base pointer-events-auto uppercase tracking-wider">
+            <button id="btn-pause" class="cartoon-pill px-4 py-1.5 text-sm sm:text-base pointer-events-auto uppercase tracking-wider invisible">
                 PAUSE
             </button>
         </div>
 
-        <!-- Center Prompt / Countdown / Modals -->
-        <div class="flex flex-col items-center justify-center my-auto">
+        <!-- Center Prompt / Start Match Overlay / Modals -->
+        <div class="flex flex-col items-center justify-center my-auto w-full">
+
+            <!-- Pre-Race Start Match Overlay -->
+            <div id="start-overlay" class="flex flex-col items-center gap-4 pointer-events-auto z-30">
+                <div class="bg-[#161e31] text-[#facc15] border-[3px] border-white px-4 py-1 rounded-full text-xs sm:text-sm font-extrabold uppercase tracking-widest shadow-[0_4px_0_rgba(0,0,0,0.3)]">
+                    🏁 Starting Grid Ready &bull; 7 Riders
+                </div>
+
+                <button id="btn-start-match" class="start-match-btn px-9 py-4 sm:px-12 sm:py-5 text-2xl sm:text-4xl flex items-center gap-3.5">
+                    <span class="w-7 h-7 sm:w-9 sm:h-9 rounded-full border-[3px] border-[#161e31] checkered-box inline-block flex-shrink-0 shadow-sm"></span>
+                    <span>START MATCH</span>
+                    <span>&rarr;</span>
+                </button>
+            </div>
+
             <!-- Drag / Steering Prompt (Matches "Drag / Flick to Shoot" black pill from Reference 2) -->
-            <div id="steer-prompt" class="bg-[#161e31]/90 text-white px-5 py-2 rounded-full border-2 border-white/25 text-xs sm:text-sm font-bold tracking-wide shadow-lg animate-pulse">
+            <div id="steer-prompt" class="mt-4 bg-[#161e31]/90 text-white px-5 py-2 rounded-full border-2 border-white/25 text-xs sm:text-sm font-bold tracking-wide shadow-lg animate-pulse transition-opacity duration-300">
                 Drag / Touch or Arrow Keys to Steer &bull; Hit Blue Pads!
             </div>
 
@@ -242,7 +302,11 @@
             if (!soundEnabled || !audioInitialized) return;
             try {
                 const now = Tone.now();
-                if (type === 'boost') {
+                if (type === 'start') {
+                    padSynth.triggerAttackRelease("G4", "16n", now);
+                    padSynth.triggerAttackRelease("C5", "16n", now + 0.09);
+                    synth.triggerAttackRelease(["E5", "G5", "C6"], "8n", now + 0.18);
+                } else if (type === 'boost') {
                     padSynth.triggerAttackRelease("C5", "16n", now);
                     padSynth.triggerAttackRelease("E5", "16n", now + 0.06);
                     padSynth.triggerAttackRelease("G5", "8n", now + 0.12);
@@ -269,39 +333,52 @@
 
         const COLORS = {
             navyOutline: 0x161e31,
-            trackSurface: 0x161e31,     // Dark navy track surface from Reference 2
-            sandFloor: 0xf6be85,        // Warm peach/tan surrounding floor from Reference 2
+            trackSurface: 0x1e293b,     // Crisp dark slate-navy track surface
+            sandFloor: 0xffd599,        // Bright sunny golden-peach floor
+            sandDark: 0xffbe76,
             whiteLine: 0xffffff,
-            boostCyan: 0x38bdf8,
-            obstaclePink: 0xf43f5e,
-            cactusGreen: 0x84cc16,
-            gold: 0xfacc15
+            boostCyan: 0x00f2fe,
+            obstaclePink: 0xff2a6d,
+            cactusGreen: 0x7bed9f,
+            gold: 0xffdd00,
+            skin: 0xffe4c4,
+            mesaRed: 0xff7f50
         };
 
         const RACER_PALETTES = [
-            { name: "YOU", shirt: 0xa3e635, helmet: 0xffffff, shorts: 0x15803d, isPlayer: true },
-            { name: "Bot Red", shirt: 0xef4444, helmet: 0xfca5a5, shorts: 0x7f1d1d },
-            { name: "Bot Blue", shirt: 0x3b82f6, helmet: 0x93c5fd, shorts: 0x1e3a8a },
-            { name: "Bot Gold", shirt: 0xfacc15, helmet: 0xfef08a, shorts: 0x854d0e },
-            { name: "Bot Pink", shirt: 0xec4899, helmet: 0xf9a8d4, shorts: 0x831843 },
-            { name: "Bot Cyan", shirt: 0x06b6d4, helmet: 0x67e8f9, shorts: 0x164e63 },
-            { name: "Bot Purple", shirt: 0xa855f7, helmet: 0xd8b4fe, shorts: 0x581c87 }
+            { name: "YOU", shirt: 0xa3e635, helmet: 0xffffff, shorts: 0x15803d, bike: 0xfacc15, visor: 0x38bdf8, isPlayer: true },
+            { name: "Bot Red", shirt: 0xff3838, helmet: 0xffcccc, shorts: 0x990000, bike: 0xffffff, visor: 0xffdd00 },
+            { name: "Bot Blue", shirt: 0x18dcff, helmet: 0xffffff, shorts: 0x006266, bike: 0xffdd00, visor: 0xff2a6d },
+            { name: "Bot Gold", shirt: 0xffdd00, helmet: 0xfff200, shorts: 0xcc8e35, bike: 0xff6348, visor: 0x161e31 },
+            { name: "Bot Pink", shirt: 0xff4d88, helmet: 0xffb8d1, shorts: 0x831843, bike: 0xffffff, visor: 0x00f2fe },
+            { name: "Bot Cyan", shirt: 0x00f2fe, helmet: 0xffffff, shorts: 0x0a3d62, bike: 0xa3e635, visor: 0xff2a6d },
+            { name: "Bot Purple", shirt: 0xc56cf0, helmet: 0xf3a683, shorts: 0x574b90, bike: 0xff9ff3, visor: 0xffdd00 }
+        ];
+
+        const HOME_PALETTES = [
+            { wall: 0xfffbeb, roof: 0xff4757, door: 0x1e90ff, trim: 0xffffff, awning: 0xff6b81 },
+            { wall: 0xe0f2fe, roof: 0xff6348, door: 0xffdd59, trim: 0xffffff, awning: 0x38bdf8 },
+            { wall: 0xfef08a, roof: 0x2ed573, door: 0xff4757, trim: 0xffffff, awning: 0x7bed9f },
+            { wall: 0xfce7f3, roof: 0xa855f7, door: 0x00f2fe, trim: 0xffffff, awning: 0xf472b6 },
+            { wall: 0xdcfce7, roof: 0xf59e0b, door: 0xef4444, trim: 0xffffff, awning: 0xfacc15 }
         ];
 
         let state = {
             level: 1,
-            mode: 'racing', // 'racing', 'paused', 'finished'
+            mode: 'ready',    // 'ready', 'racing', 'paused', 'finished'
             botDifficulty: 1, // 0: Easy, 1: Normal, 2: Pro
             camMode: 0,       // 0: Chase, 1: High Action
             steerInput: 0,
             targetX: 0,
             isDragging: false,
             pointerStartX: 0,
-            playerStartX: 0
+            playerStartX: 0,
+            idleTime: 0,
+            raceTime: 0
         };
 
         /**************************************************************
-         * THREE.JS SCENE & CARTOON GRAPHICS ENGINE
+         * THREE.JS SCENE & CEL-SHADED CARTOON GRAPHICS ENGINE
          **************************************************************/
         const canvas = document.getElementById('game-canvas');
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -312,35 +389,71 @@
 
         const scene = new THREE.Scene();
 
-        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 450);
+        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 520);
 
-        // Crisp Cartoon Lighting
+        // 1. Custom 4-Step Bright Toon Gradient Map for Crisp Cel-Shaded Lighting
+        function createToonGradientMap() {
+            const data = new Uint8Array([
+                185, 185, 195, 255,
+                220, 220, 230, 255,
+                245, 245, 250, 255,
+                255, 255, 255, 255
+            ]);
+            const texture = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
+            texture.minFilter = THREE.NearestFilter;
+            texture.magFilter = THREE.NearestFilter;
+            texture.generateMipmaps = false;
+            texture.needsUpdate = true;
+            return texture;
+        }
+        const toonGradientMap = createToonGradientMap();
+
+        // 2. Bright Cartoon Lighting (Hemisphere Sky/Sand Bounce + High-Res Sun Shadows)
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.65);
-        dirLight.position.set(35, 80, 50);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffe0b2, 0.65);
+        hemiLight.position.set(0, 60, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffef0, 0.92);
+        dirLight.position.set(35, 85, 50);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
         dirLight.shadow.camera.near = 10;
-        dirLight.shadow.camera.far = 220;
-        const d = 35;
+        dirLight.shadow.camera.far = 240;
+        dirLight.shadow.bias = -0.0005;
+        const d = 38;
         dirLight.shadow.camera.left = -d;
         dirLight.shadow.camera.right = d;
         dirLight.shadow.camera.top = d;
         dirLight.shadow.camera.bottom = -d;
         scene.add(dirLight);
 
-        // Helper: Creates a mesh with an inverted-hull cartoon dark navy outline
+        // Helper: Creates a vivid cel-shaded mesh with self-illuminated color pop & dark navy outline
         const outlineMat = new THREE.MeshBasicMaterial({
             color: COLORS.navyOutline,
             side: THREE.BackSide
         });
 
+        const materialCache = new Map();
+        function getToonMaterial(colorHex) {
+            if (!materialCache.has(colorHex)) {
+                const baseColor = new THREE.Color(colorHex);
+                materialCache.set(colorHex, new THREE.MeshToonMaterial({
+                    color: baseColor,
+                    emissive: baseColor,
+                    emissiveIntensity: 0.22,
+                    gradientMap: toonGradientMap
+                }));
+            }
+            return materialCache.get(colorHex);
+        }
+
         function createCartoonMesh(geometry, colorHex, outlineThickness = 0.08, castShadow = true) {
             const group = new THREE.Group();
-            const mat = new THREE.MeshLambertMaterial({ color: colorHex });
+            const mat = getToonMaterial(colorHex);
             const mesh = new THREE.Mesh(geometry, mat);
             mesh.castShadow = castShadow;
             mesh.receiveShadow = true;
@@ -362,142 +475,292 @@
         const trackGroup = new THREE.Group();
         scene.add(trackGroup);
 
+        const fxGroup = new THREE.Group();
+        scene.add(fxGroup);
+
         let boostPads = [];
         let obstacles = [];
-        let sceneryItems = [];
+        let clouds = [];
+        let finishFlags = [];
         let confettiParticles = [];
+        let fxParticles = [];
         let racers = [];
 
         /**************************************************************
-         * TRACK, PROPS & FINISH ARCH BUILDER
+         * TRACK, CURBS, PROPS & FINISH ARCH BUILDER
          **************************************************************/
+        function buildCheckeredStrip(width, length, cols, rows) {
+            const group = new THREE.Group();
+            const tileW = width / cols;
+            const tileL = length / rows;
+            const geo = new THREE.PlaneGeometry(tileW + 0.01, tileL + 0.01);
+            geo.rotateX(-Math.PI / 2);
+
+            const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const navyMat = new THREE.MeshBasicMaterial({ color: COLORS.navyOutline });
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const isDark = (r + c) % 2 === 1;
+                    const tile = new THREE.Mesh(geo, isDark ? navyMat : whiteMat);
+                    tile.position.set(
+                        -width / 2 + tileW * (c + 0.5),
+                        0,
+                        -length / 2 + tileL * (r + 0.5)
+                    );
+                    group.add(tile);
+                }
+            }
+            return group;
+        }
+
         function buildTrack() {
-            // Clear existing track objects
+            // Clear existing track & FX objects
             while (trackGroup.children.length > 0) {
                 trackGroup.remove(trackGroup.children[0]);
             }
+            while (fxGroup.children.length > 0) {
+                fxGroup.remove(fxGroup.children[0]);
+            }
             boostPads = [];
             obstacles = [];
-            sceneryItems = [];
+            clouds = [];
+            finishFlags = [];
             confettiParticles = [];
+            fxParticles = [];
 
             TRACK_LENGTH = 780 + (state.level - 1) * 120;
 
             // 1. Warm Peach/Tan Ground Table (Matches Reference 2)
-            const sandGeo = new THREE.PlaneGeometry(500, TRACK_LENGTH + 400);
-            const sandMat = new THREE.MeshLambertMaterial({ color: COLORS.sandFloor });
+            const sandGeo = new THREE.PlaneGeometry(540, TRACK_LENGTH + 450);
+            const sandMat = getToonMaterial(COLORS.sandFloor);
             const sandMesh = new THREE.Mesh(sandGeo, sandMat);
             sandMesh.rotation.x = -Math.PI / 2;
             sandMesh.position.set(0, -0.15, -TRACK_LENGTH / 2 + 40);
             sandMesh.receiveShadow = true;
             trackGroup.add(sandMesh);
 
+            // Subtle Darker Sand Dunes / Strips on the sides for depth
+            const duneGeo = new THREE.PlaneGeometry(180, TRACK_LENGTH + 400);
+            const duneMat = getToonMaterial(COLORS.sandDark);
+            [-1, 1].forEach(side => {
+                const dune = new THREE.Mesh(duneGeo, duneMat);
+                dune.rotation.x = -Math.PI / 2;
+                dune.position.set(side * 125, -0.13, -TRACK_LENGTH / 2 + 40);
+                dune.receiveShadow = true;
+                trackGroup.add(dune);
+            });
+
             // Top Horizon Border Line (Separating Tan Floor & Green Wall like Reference 2)
             const horizonWallBorder = new THREE.Mesh(
-                new THREE.BoxGeometry(500, 0.4, 1.5),
-                new THREE.MeshBasicMaterial({ color: 0xb48a5a })
+                new THREE.BoxGeometry(540, 0.5, 1.8),
+                new THREE.MeshBasicMaterial({ color: COLORS.navyOutline })
             );
-            horizonWallBorder.position.set(0, 0, -TRACK_LENGTH - 90);
+            horizonWallBorder.position.set(0, 0, -TRACK_LENGTH - 95);
             trackGroup.add(horizonWallBorder);
 
-            // 2. Crisp Dark Navy Track Board with White Borders (Matches Cup Pong Table Style)
-            const outerBoardGeo = new THREE.BoxGeometry(TRACK_WIDTH + 1.4, 0.22, TRACK_LENGTH + 60);
+            // 2. Crisp Dark Navy Track Board with White Borders & 3D Racing Curbs
+            const outerBoardGeo = new THREE.BoxGeometry(TRACK_WIDTH + 1.8, 0.22, TRACK_LENGTH + 65);
             const outerBoardMat = new THREE.MeshBasicMaterial({ color: COLORS.navyOutline });
             const outerBoard = new THREE.Mesh(outerBoardGeo, outerBoardMat);
-            outerBoard.position.set(0, -0.08, -TRACK_LENGTH / 2 + 10);
+            outerBoard.position.set(0, -0.08, -TRACK_LENGTH / 2 + 12);
             trackGroup.add(outerBoard);
 
-            const whiteTrimGeo = new THREE.BoxGeometry(TRACK_WIDTH + 0.7, 0.24, TRACK_LENGTH + 59);
+            const whiteTrimGeo = new THREE.BoxGeometry(TRACK_WIDTH + 1.0, 0.25, TRACK_LENGTH + 64);
             const whiteTrimMat = new THREE.MeshBasicMaterial({ color: COLORS.whiteLine });
             const whiteTrim = new THREE.Mesh(whiteTrimGeo, whiteTrimMat);
-            whiteTrim.position.set(0, -0.06, -TRACK_LENGTH / 2 + 10);
+            whiteTrim.position.set(0, -0.06, -TRACK_LENGTH / 2 + 12);
             trackGroup.add(whiteTrim);
 
-            const innerRoadGeo = new THREE.BoxGeometry(TRACK_WIDTH - 0.2, 0.26, TRACK_LENGTH + 58);
-            const innerRoadMat = new THREE.MeshLambertMaterial({ color: COLORS.trackSurface });
+            const innerRoadGeo = new THREE.BoxGeometry(TRACK_WIDTH - 0.1, 0.28, TRACK_LENGTH + 62);
+            const innerRoadMat = getToonMaterial(COLORS.trackSurface);
             const innerRoad = new THREE.Mesh(innerRoadGeo, innerRoadMat);
-            innerRoad.position.set(0, -0.04, -TRACK_LENGTH / 2 + 10);
+            innerRoad.position.set(0, -0.04, -TRACK_LENGTH / 2 + 12);
             innerRoad.receiveShadow = true;
             trackGroup.add(innerRoad);
 
-            // Center White Racing Line (Matches Reference 2 center table stripe)
-            const centerStripeGeo = new THREE.PlaneGeometry(0.38, TRACK_LENGTH);
-            const centerStripeMat = new THREE.MeshBasicMaterial({ color: COLORS.whiteLine });
-            const centerStripe = new THREE.Mesh(centerStripeGeo, centerStripeMat);
-            centerStripe.rotation.x = -Math.PI / 2;
-            centerStripe.position.set(0, 0.11, -TRACK_LENGTH / 2);
-            trackGroup.add(centerStripe);
+            // Alternating Red & White 3D Rumble Curbs along Track Edges
+            const curbLen = 4.5;
+            const curbGeo = new THREE.BoxGeometry(0.48, 0.16, curbLen);
+            const redCurbMat = getToonMaterial(0xff1654);
+            const whiteCurbMat = getToonMaterial(0xffffff);
+            const totalCurbs = Math.floor((TRACK_LENGTH + 40) / curbLen);
+            for (let i = 0; i < totalCurbs; i++) {
+                const zPos = 20 - i * curbLen;
+                const mat = i % 2 === 0 ? redCurbMat : whiteCurbMat;
 
-            // 3. Spawn Boost Pads & Obstacles along the track
+                const leftCurb = new THREE.Mesh(curbGeo, mat);
+                leftCurb.position.set(-TRACK_WIDTH / 2 - 0.15, 0.12, zPos);
+                leftCurb.receiveShadow = true;
+                trackGroup.add(leftCurb);
+
+                const rightCurb = new THREE.Mesh(curbGeo, mat);
+                rightCurb.position.set(TRACK_WIDTH / 2 + 0.15, 0.12, zPos);
+                rightCurb.receiveShadow = true;
+                trackGroup.add(rightCurb);
+            }
+
+            // Center Dashed Racing Line & Solid Side Lanes
+            const dashGeo = new THREE.PlaneGeometry(0.38, 4.2);
+            dashGeo.rotateX(-Math.PI / 2);
+            const dashMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            for (let z = 10; z > -TRACK_LENGTH; z -= 9) {
+                const dash = new THREE.Mesh(dashGeo, dashMat);
+                dash.position.set(0, 0.115, z);
+                trackGroup.add(dash);
+            }
+
+            // Checkered Starting Grid Strip at Front of Pack
+            const startCheckered = buildCheckeredStrip(TRACK_WIDTH - 0.3, 1.8, 14, 2);
+            startCheckered.position.set(0, 0.125, -28.5);
+            trackGroup.add(startCheckered);
+
+            // 3. Spawn Animated Boost Pads & Dynamic Obstacles along the track
             const numSegments = Math.floor(TRACK_LENGTH / 32);
             for (let i = 2; i < numSegments - 1; i++) {
                 const zPos = -i * 32;
 
-                // Cyan Speed Boost Pad
+                // Cyan Speed Boost Pad with 3 Animated Chevrons
                 if (i % 2 === 0 || Math.random() < 0.45) {
-                    const padX = (Math.random() - 0.5) * (TRACK_WIDTH - 3.5);
+                    const padX = (Math.random() - 0.5) * (TRACK_WIDTH - 3.6);
                     const padGroup = new THREE.Group();
 
+                    // Outer dark navy frame + glowing cyan base
                     const padBase = createCartoonMesh(
-                        new THREE.BoxGeometry(2.4, 0.12, 4.2),
+                        new THREE.BoxGeometry(2.5, 0.12, 4.6),
                         COLORS.boostCyan,
-                        0.06,
+                        0.07,
                         false
                     );
                     padGroup.add(padBase);
 
-                    // White Chevron Stripe on Pad
-                    const chevron = new THREE.Mesh(
-                        new THREE.BoxGeometry(1.4, 0.16, 1.2),
-                        new THREE.MeshBasicMaterial({ color: 0xffffff })
-                    );
-                    padGroup.add(chevron);
+                    // 3 Triple-Chevron Arrows on Pad
+                    const chevrons = [];
+                    for (let c = 0; c < 3; c++) {
+                        const chevGroup = new THREE.Group();
+                        const barGeo = new THREE.BoxGeometry(0.95, 0.16, 0.26);
+                        const barMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-                    padGroup.position.set(padX, 0.1, zPos);
+                        const leftWing = new THREE.Mesh(barGeo, barMat);
+                        leftWing.position.set(-0.34, 0, 0);
+                        leftWing.rotation.y = 0.55;
+                        chevGroup.add(leftWing);
+
+                        const rightWing = new THREE.Mesh(barGeo, barMat);
+                        rightWing.position.set(0.34, 0, 0);
+                        rightWing.rotation.y = -0.55;
+                        chevGroup.add(rightWing);
+
+                        chevGroup.position.set(0, 0.04, 1.2 - c * 1.2);
+                        padGroup.add(chevGroup);
+                        chevrons.push(chevGroup);
+                    }
+
+                    padGroup.position.set(padX, 0.11, zPos);
                     trackGroup.add(padGroup);
-                    boostPads.push({ mesh: padGroup, x: padX, z: zPos, width: 2.3, length: 4.2 });
+                    boostPads.push({
+                        mesh: padGroup,
+                        chevrons,
+                        x: padX,
+                        z: zPos,
+                        width: 2.5,
+                        length: 4.6
+                    });
                 }
 
-                // Cartoon Cup / Barrier Obstacles (Inspired by Cup Pong Cups & Western Barrels)
+                // Cartoon Cup / Barrier Obstacles with Tumbling Physics
                 const numObs = Math.random() < 0.45 ? 2 : 1;
                 for (let j = 0; j < numObs; j++) {
-                    const obsX = (Math.random() - 0.5) * (TRACK_WIDTH - 2.6);
+                    const obsX = (Math.random() - 0.5) * (TRACK_WIDTH - 2.8);
                     const obsZ = zPos - 14 + (Math.random() - 0.5) * 6;
 
-                    const cupGroup = createCartoonCupObstacle(j % 2 === 0 ? 0x84cc16 : 0xf43f5e);
+                    const cupGroup = createCartoonCupObstacle(j % 2 === 0 ? 0x65ef19 : 0xff1654);
                     cupGroup.position.set(obsX, 0.1, obsZ);
                     trackGroup.add(cupGroup);
 
                     obstacles.push({
                         mesh: cupGroup,
                         x: obsX,
+                        y: 0.1,
                         z: obsZ,
-                        radius: 0.85,
+                        vx: 0,
+                        vy: 0,
+                        vz: 0,
+                        rx: 0,
+                        ry: 0,
+                        rz: 0,
+                        radius: 0.88,
                         hit: false
                     });
                 }
             }
 
-            // 4. Cartoon Desert Cacti & Western Props on the Tan Floor (From Reference 1 + Reference 2 Style)
-            for (let z = -15; z > -TRACK_LENGTH - 30; z -= 22) {
+            // 4. Colorful Cartoon Neighborhood Homes, Cacti & Mesas along Both Sides of Track
+            let homeIdx = 0;
+            for (let z = -10; z > -TRACK_LENGTH - 40; z -= 18) {
                 [-1, 1].forEach(side => {
-                    const xOffset = side * (TRACK_WIDTH / 2 + 4 + Math.random() * 14);
-                    if (Math.random() < 0.65) {
+                    const rand = Math.random();
+                    // Frequent colorful 3D Homes & Cottages lining the road
+                    if (rand < 0.58) {
+                        const home = createCartoonHome(HOME_PALETTES[homeIdx % HOME_PALETTES.length]);
+                        homeIdx++;
+                        const homeX = side * (TRACK_WIDTH / 2 + 10.5 + Math.random() * 5);
+                        home.position.set(homeX, 0, z + (Math.random() - 0.5) * 4);
+                        // Angle home slightly toward the road
+                        home.rotation.y = side > 0 ? -Math.PI / 2 + 0.22 : Math.PI / 2 - 0.22;
+                        const hs = 0.92 + Math.random() * 0.28;
+                        home.scale.set(hs, hs, hs);
+                        trackGroup.add(home);
+                    } else if (rand < 0.82) {
+                        const xOffset = side * (TRACK_WIDTH / 2 + 4.5 + Math.random() * 10);
                         const cactus = createCartoonCactus();
-                        cactus.position.set(xOffset, 0, z + (Math.random() - 0.5) * 10);
+                        cactus.position.set(xOffset, 0, z + (Math.random() - 0.5) * 8);
+                        cactus.rotation.y = Math.random() * Math.PI * 2;
                         const s = 0.85 + Math.random() * 0.5;
                         cactus.scale.set(s, s, s);
                         trackGroup.add(cactus);
                     } else {
-                        const house = createCartoonWesternBuilding();
-                        house.position.set(side * (TRACK_WIDTH / 2 + 12 + Math.random() * 8), 0, z);
-                        house.rotation.y = side > 0 ? -0.25 : 0.25;
-                        trackGroup.add(house);
+                        const xOffset = side * (TRACK_WIDTH / 2 + 5.5 + Math.random() * 10);
+                        const rock = createDesertRockCluster();
+                        rock.position.set(xOffset, 0, z + (Math.random() - 0.5) * 8);
+                        rock.rotation.y = Math.random() * Math.PI;
+                        trackGroup.add(rock);
+                    }
+
+                    // Distant Monument Valley Style Mesas along the outer horizon
+                    if (Math.abs(z) % 72 === 10) {
+                        const mesa = createDesertMesa();
+                        mesa.position.set(side * (38 + Math.random() * 22), -0.1, z - Math.random() * 20);
+                        mesa.rotation.y = Math.random() * Math.PI;
+                        trackGroup.add(mesa);
                     }
                 });
             }
 
-            // 5. Checkered Finish Arch (From Reference 1)
+            // 5. Puffy 3D Cartoon Clouds floating in the sky
+            for (let z = 0; z > -TRACK_LENGTH - 120; z -= 55) {
+                [-1, 1].forEach(side => {
+                    if (Math.random() < 0.75) {
+                        const cloud = createCartoonCloud();
+                        cloud.position.set(
+                            side * (18 + Math.random() * 35),
+                            18 + Math.random() * 10,
+                            z + (Math.random() - 0.5) * 25
+                        );
+                        const cs = 0.9 + Math.random() * 0.7;
+                        cloud.scale.set(cs, cs, cs);
+                        trackGroup.add(cloud);
+                        clouds.push({
+                            mesh: cloud,
+                            speedX: (Math.random() * 0.6 + 0.3) * side,
+                            baseY: cloud.position.y,
+                            phase: Math.random() * Math.PI * 2
+                        });
+                    }
+                });
+            }
+
+            // 6. Checkered Finish Arch (From Reference 1)
             const finishArch = createFinishArch();
             finishArch.position.set(0, 0, -TRACK_LENGTH);
             trackGroup.add(finishArch);
@@ -506,69 +769,204 @@
         // Builds a stylized cartoon Cup/Bumper obstacle like the green/white cups in Reference 2
         function createCartoonCupObstacle(colorHex) {
             const group = new THREE.Group();
-            const cupGeo = new THREE.CylinderGeometry(0.75, 0.52, 1.45, 14);
+            const cupGeo = new THREE.CylinderGeometry(0.78, 0.52, 1.5, 16);
             const cupMesh = createCartoonMesh(cupGeo, colorHex, 0.09, true);
-            cupMesh.position.y = 0.72;
+            cupMesh.position.y = 0.75;
             group.add(cupMesh);
 
-            // White Rim
-            const rimGeo = new THREE.TorusGeometry(0.75, 0.11, 8, 16);
-            const rimMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const rim = new THREE.Mesh(rimGeo, rimMat);
-            rim.rotation.x = Math.PI / 2;
-            rim.position.y = 1.45;
-            group.add(rim);
+            // White Decorative Center Stripe on Cup
+            const stripeGeo = new THREE.CylinderGeometry(0.68, 0.62, 0.32, 16);
+            const stripeMesh = new THREE.Mesh(stripeGeo, getToonMaterial(0xffffff));
+            stripeMesh.position.y = 0.75;
+            group.add(stripeMesh);
+
+            // Chunky White Lip Rim with Outline
+            const rimGeo = new THREE.TorusGeometry(0.78, 0.12, 10, 18);
+            const rimMesh = createCartoonMesh(rimGeo, 0xffffff, 0.12, false);
+            rimMesh.rotation.x = Math.PI / 2;
+            rimMesh.position.y = 1.5;
+            group.add(rimMesh);
+
+            // Dark Hollow Interior Top
+            const innerGeo = new THREE.CircleGeometry(0.68, 16);
+            innerGeo.rotateX(-Math.PI / 2);
+            const innerMesh = new THREE.Mesh(innerGeo, new THREE.MeshBasicMaterial({ color: COLORS.navyOutline }));
+            innerMesh.position.y = 1.51;
+            group.add(innerMesh);
+
+            return group;
+        }
+
+        // Builds a colorful 3D Cartoon Home with pitched roof, chimney, glowing windows, yard & fence
+        function createCartoonHome(palette) {
+            const group = new THREE.Group();
+
+            // 1. Green Front Lawn Patch
+            const lawn = createCartoonMesh(new THREE.BoxGeometry(8.2, 0.18, 7.6), 0x84cc16, 0.04, false);
+            lawn.position.set(0, 0.05, 0.5);
+            group.add(lawn);
+
+            // 2. Main House Cozy Walls
+            const body = createCartoonMesh(new THREE.BoxGeometry(6.0, 4.2, 5.0), palette.wall, 0.05, true);
+            body.position.set(0, 2.1, 0);
+            group.add(body);
+
+            // 3. Pitched Pyramid Roof with Overhang
+            const roof = createCartoonMesh(new THREE.ConeGeometry(5.1, 2.7, 4), palette.roof, 0.06, true);
+            roof.position.set(0, 5.5, 0);
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+
+            // 4. Brick Chimney on Roof
+            const chimney = createCartoonMesh(new THREE.BoxGeometry(0.9, 2.1, 0.9), 0xef4444, 0.08, true);
+            chimney.position.set(1.5, 5.7, -0.8);
+            group.add(chimney);
+
+            const chimneyTop = createCartoonMesh(new THREE.BoxGeometry(1.15, 0.3, 1.15), 0xffffff, 0.08, false);
+            chimneyTop.position.set(1.5, 6.75, -0.8);
+            group.add(chimneyTop);
+
+            // 5. Front Porch Step & Colorful Front Door
+            const step = createCartoonMesh(new THREE.BoxGeometry(1.9, 0.3, 1.2), 0xffffff, 0.08, false);
+            step.position.set(0, 0.22, 2.75);
+            group.add(step);
+
+            const door = createCartoonMesh(new THREE.BoxGeometry(1.3, 2.35, 0.22), palette.door, 0.09, false);
+            door.position.set(0, 1.3, 2.52);
+            group.add(door);
+
+            // Golden Doorknob
+            const knob = new THREE.Mesh(
+                new THREE.SphereGeometry(0.11, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xffdd00 })
+            );
+            knob.position.set(0.38, 1.25, 2.68);
+            group.add(knob);
+
+            // Cute Porch Awning above Door
+            const awning = createCartoonMesh(new THREE.BoxGeometry(2.2, 0.35, 1.1), palette.awning, 0.08, false);
+            awning.position.set(0, 2.78, 2.8);
+            awning.rotation.x = 0.24;
+            group.add(awning);
+
+            // 6. Glowing Sky-Blue Cartoon Windows with White Frames (Left & Right)
+            [-1.85, 1.85].forEach(wx => {
+                const winFrame = createCartoonMesh(new THREE.BoxGeometry(1.35, 1.35, 0.2), palette.trim, 0.09, false);
+                winFrame.position.set(wx, 2.25, 2.5);
+                group.add(winFrame);
+
+                const glass = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.05, 1.05, 0.26),
+                    new THREE.MeshBasicMaterial({ color: 0x7dd3fc })
+                );
+                glass.position.set(wx, 2.25, 2.5);
+                group.add(glass);
+
+                // Window Flower Box
+                const planter = createCartoonMesh(new THREE.BoxGeometry(1.4, 0.35, 0.45), 0xd97706, 0.09, false);
+                planter.position.set(wx, 1.42, 2.65);
+                group.add(planter);
+            });
+
+            // 7. White Picket Fence & Yard Bush in Front
+            [-2.7, -1.7, 1.7, 2.7].forEach(fx => {
+                const post = createCartoonMesh(new THREE.BoxGeometry(0.28, 1.05, 0.16), 0xffffff, 0.1, false);
+                post.position.set(fx, 0.58, 3.85);
+                group.add(post);
+            });
+
+            const bushL = createCartoonMesh(new THREE.IcosahedronGeometry(0.75, 0), 0x2ed573, 0.09, true);
+            bushL.position.set(-2.6, 0.7, 2.2);
+            group.add(bushL);
 
             return group;
         }
 
         function createCartoonCactus() {
             const group = new THREE.Group();
-            const trunk = createCartoonMesh(new THREE.CylinderGeometry(0.45, 0.55, 3.6, 10), COLORS.cactusGreen, 0.08);
+            const trunk = createCartoonMesh(new THREE.CylinderGeometry(0.45, 0.56, 3.6, 10), COLORS.cactusGreen, 0.08);
             trunk.position.y = 1.8;
             group.add(trunk);
 
-            const armL = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.3, 1.4, 8), COLORS.cactusGreen, 0.08);
+            const topCap = createCartoonMesh(new THREE.SphereGeometry(0.45, 10, 10), COLORS.cactusGreen, 0.08);
+            topCap.position.y = 3.6;
+            group.add(topCap);
+
+            const armL = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.32, 1.45, 8), COLORS.cactusGreen, 0.08);
             armL.position.set(-0.75, 2.2, 0);
             armL.rotation.z = Math.PI / 4;
             group.add(armL);
 
-            const armR = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.3, 1.3, 8), COLORS.cactusGreen, 0.08);
+            const armR = createCartoonMesh(new THREE.CylinderGeometry(0.3, 0.32, 1.35, 8), COLORS.cactusGreen, 0.08);
             armR.position.set(0.75, 1.8, 0);
             armR.rotation.z = -Math.PI / 4;
             group.add(armR);
 
+            // Bright Pink Cactus Flower on Top
+            const flower = createCartoonMesh(new THREE.SphereGeometry(0.24, 8, 8), 0xff2a6d, 0.1, false);
+            flower.position.set(0, 3.98, 0);
+            group.add(flower);
+
             return group;
         }
 
-        function createCartoonWesternBuilding() {
+        function createDesertRockCluster() {
             const group = new THREE.Group();
-            const body = createCartoonMesh(new THREE.BoxGeometry(5.5, 4.2, 4.5), 0xfef3c7, 0.05);
-            body.position.y = 2.1;
-            group.add(body);
+            const rock1 = createCartoonMesh(new THREE.DodecahedronGeometry(1.35, 0), 0xff9f43, 0.07, true);
+            rock1.position.set(0, 0.75, 0);
+            rock1.scale.set(1.2, 0.85, 1.0);
+            group.add(rock1);
 
-            const roof = createCartoonMesh(new THREE.ConeGeometry(4.3, 2.2, 4), 0xb45309, 0.06);
-            roof.position.y = 5.3;
-            roof.rotation.y = Math.PI / 4;
-            group.add(roof);
+            const rock2 = createCartoonMesh(new THREE.DodecahedronGeometry(0.85, 0), 0xffbe76, 0.08, true);
+            rock2.position.set(1.1, 0.45, 0.4);
+            group.add(rock2);
+
+            return group;
+        }
+
+        function createDesertMesa() {
+            const group = new THREE.Group();
+            const base = createCartoonMesh(new THREE.CylinderGeometry(6.5, 9.8, 11.5, 7), COLORS.mesaRed, 0.04, false);
+            base.position.y = 5.75;
+            group.add(base);
+
+            const cap = createCartoonMesh(new THREE.CylinderGeometry(5.2, 6.4, 3.2, 7), 0xffbe76, 0.04, false);
+            cap.position.y = 13.0;
+            group.add(cap);
+
+            return group;
+        }
+
+        function createCartoonCloud() {
+            const group = new THREE.Group();
+            const puff1 = createCartoonMesh(new THREE.SphereGeometry(1.8, 12, 12), 0xffffff, 0.06, false);
+            group.add(puff1);
+
+            const puff2 = createCartoonMesh(new THREE.SphereGeometry(1.35, 12, 12), 0xffffff, 0.06, false);
+            puff2.position.set(-1.45, -0.25, 0.2);
+            group.add(puff2);
+
+            const puff3 = createCartoonMesh(new THREE.SphereGeometry(1.45, 12, 12), 0xffffff, 0.06, false);
+            puff3.position.set(1.45, -0.2, -0.15);
+            group.add(puff3);
 
             return group;
         }
 
         function createFinishArch() {
             const arch = new THREE.Group();
-            const pillarGeo = new THREE.BoxGeometry(1.5, 8.5, 1.5);
+            const pillarGeo = new THREE.BoxGeometry(1.5, 8.8, 1.5);
             const leftPillar = createCartoonMesh(pillarGeo, 0xffffff, 0.06);
-            leftPillar.position.set(-TRACK_WIDTH / 2 + 0.5, 4.25, 0);
+            leftPillar.position.set(-TRACK_WIDTH / 2 + 0.5, 4.4, 0);
             arch.add(leftPillar);
 
             const rightPillar = createCartoonMesh(pillarGeo, 0xffffff, 0.06);
-            rightPillar.position.set(TRACK_WIDTH / 2 - 0.5, 4.25, 0);
+            rightPillar.position.set(TRACK_WIDTH / 2 - 0.5, 4.4, 0);
             arch.add(rightPillar);
 
             // Checkered blocks on pillars
             for (let y = 1; y < 8; y += 1.4) {
-                const blockL = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 1.6), new THREE.MeshBasicMaterial({ color: COLORS.navyOutline }));
+                const blockL = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.7, 1.62), new THREE.MeshBasicMaterial({ color: COLORS.navyOutline }));
                 blockL.position.set(-TRACK_WIDTH / 2 + 0.5, y, 0);
                 arch.add(blockL);
 
@@ -577,90 +975,251 @@
                 arch.add(blockR);
             }
 
-            // Top Banner
-            const banner = createCartoonMesh(new THREE.BoxGeometry(TRACK_WIDTH + 2, 2.2, 1.6), 0xfacc15, 0.05);
-            banner.position.set(0, 8.2, 0);
+            // Top Banner with Gold & Pink Trim
+            const banner = createCartoonMesh(new THREE.BoxGeometry(TRACK_WIDTH + 2.4, 2.3, 1.7), 0xfacc15, 0.05);
+            banner.position.set(0, 8.5, 0);
             arch.add(banner);
 
-            // Ground Checkered Strip
-            const finishLine = new THREE.Mesh(
-                new THREE.PlaneGeometry(TRACK_WIDTH, 2.2),
-                new THREE.MeshBasicMaterial({ color: 0xffffff })
-            );
-            finishLine.rotation.x = -Math.PI / 2;
-            finishLine.position.set(0, 0.14, 0);
-            arch.add(finishLine);
+            const subBanner = createCartoonMesh(new THREE.BoxGeometry(TRACK_WIDTH + 1.2, 0.9, 1.85), 0xf43f5e, 0.05);
+            subBanner.position.set(0, 8.5, 0);
+            arch.add(subBanner);
+
+            // Waving Flags on Top of Arch
+            [-TRACK_WIDTH / 2 + 0.5, 0, TRACK_WIDTH / 2 - 0.5].forEach((xPos, idx) => {
+                const pole = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8),
+                    new THREE.MeshBasicMaterial({ color: COLORS.navyOutline })
+                );
+                pole.position.set(xPos, 10.6, 0);
+                arch.add(pole);
+
+                const flagColor = idx === 1 ? 0x84cc16 : 0x38bdf8;
+                const flag = createCartoonMesh(new THREE.BoxGeometry(1.3, 0.75, 0.12), flagColor, 0.08, false);
+                flag.position.set(xPos + 0.65, 11.2, 0);
+                arch.add(flag);
+                finishFlags.push({ mesh: flag, baseX: xPos + 0.65, phase: idx * 1.5 });
+            });
+
+            // Multi-Tile Ground Checkered Finish Line
+            const finishCheckered = buildCheckeredStrip(TRACK_WIDTH - 0.2, 2.6, 14, 3);
+            finishCheckered.position.set(0, 0.13, 0);
+            arch.add(finishCheckered);
 
             return arch;
         }
 
         /**************************************************************
-         * 3D CARTOON CYCLIST BUILDER
+         * DETAILED 3D CARTOON BICYCLE & CYCLIST BUILDER
          **************************************************************/
+        function buildDetailedWheel() {
+            const wheelGroup = new THREE.Group();
+
+            // 1. Chunky Dark Rubber Tire with Cartoon Outline
+            const tireGeo = new THREE.TorusGeometry(0.48, 0.13, 10, 20);
+            tireGeo.rotateY(Math.PI / 2);
+            const tire = createCartoonMesh(tireGeo, 0x1e293b, 0.14, true);
+            wheelGroup.add(tire);
+
+            // 2. Bright White/Metallic Rim
+            const rimGeo = new THREE.TorusGeometry(0.36, 0.045, 8, 18);
+            rimGeo.rotateY(Math.PI / 2);
+            const rim = new THREE.Mesh(rimGeo, getToonMaterial(0xffffff));
+            wheelGroup.add(rim);
+
+            // 3. Center Hub & Intersecting Spokes (Visibly spin during race!)
+            const hubGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.26, 10);
+            hubGeo.rotateZ(Math.PI / 2);
+            const hub = createCartoonMesh(hubGeo, 0xfacc15, 0.1, false);
+            wheelGroup.add(hub);
+
+            const spokeGeo = new THREE.BoxGeometry(0.04, 0.72, 0.04);
+            const spokeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 });
+            for (let s = 0; s < 4; s++) {
+                const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+                spoke.rotation.x = (s * Math.PI) / 4;
+                wheelGroup.add(spoke);
+            }
+
+            return wheelGroup;
+        }
+
         function createCyclistMesh(palette) {
             const root = new THREE.Group();
 
-            // 1. Wheels
-            const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.22, 16);
-            wheelGeo.rotateZ(Math.PI / 2);
+            // Optional Glowing Player Ground Ring Indicator ("YOU")
+            let playerRing = null;
+            if (palette.isPlayer) {
+                const ringGroup = new THREE.Group();
+                const outerRingGeo = new THREE.RingGeometry(1.05, 1.32, 28);
+                outerRingGeo.rotateX(-Math.PI / 2);
+                const outerRing = new THREE.Mesh(
+                    outerRingGeo,
+                    new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
+                );
+                ringGroup.add(outerRing);
 
-            const backWheel = createCartoonMesh(wheelGeo, 0x334155, 0.12);
-            backWheel.position.set(0, 0.55, 0.75);
+                const innerRingGeo = new THREE.RingGeometry(0.95, 1.05, 28);
+                innerRingGeo.rotateX(-Math.PI / 2);
+                const innerRing = new THREE.Mesh(
+                    innerRingGeo,
+                    new THREE.MeshBasicMaterial({ color: COLORS.navyOutline, side: THREE.DoubleSide })
+                );
+                ringGroup.add(innerRing);
+
+                ringGroup.position.set(0, 0.14, 0);
+                root.add(ringGroup);
+                playerRing = ringGroup;
+            }
+
+            // 1. Detailed Spinning Front & Back Wheels
+            const backWheel = buildDetailedWheel();
+            backWheel.position.set(0, 0.58, 0.82);
             root.add(backWheel);
 
-            const frontWheel = createCartoonMesh(wheelGeo, 0x334155, 0.12);
-            frontWheel.position.set(0, 0.55, -0.75);
+            const frontWheel = buildDetailedWheel();
+            frontWheel.position.set(0, 0.58, -0.82);
             root.add(frontWheel);
 
-            // 2. Bike Frame
-            const frameBar = createCartoonMesh(new THREE.BoxGeometry(0.18, 0.18, 1.5), 0xffffff, 0.12);
-            frameBar.position.set(0, 0.85, 0);
-            root.add(frameBar);
+            // 2. Tubular Diamond Bike Frame
+            const frameColor = palette.bike || 0xffffff;
+            const frameGroup = new THREE.Group();
+            root.add(frameGroup);
 
-            // Handlebars
-            const handleBar = createCartoonMesh(new THREE.BoxGeometry(1.15, 0.14, 0.14), COLORS.navyOutline, 0);
-            handleBar.position.set(0, 1.48, -0.58);
-            root.add(handleBar);
+            // Top Tube
+            const topTube = createCartoonMesh(new THREE.CylinderGeometry(0.075, 0.075, 1.15, 8), frameColor, 0.15);
+            topTube.rotation.x = Math.PI / 2 - 0.1;
+            topTube.position.set(0, 1.16, -0.05);
+            frameGroup.add(topTube);
 
-            // 3. Rider Body (T-shirt torso like Reference 1 with Cartoon Outline)
+            // Down Tube
+            const downTube = createCartoonMesh(new THREE.CylinderGeometry(0.085, 0.085, 1.15, 8), frameColor, 0.15);
+            downTube.rotation.x = Math.PI / 4 + 0.15;
+            downTube.position.set(0, 0.88, -0.15);
+            frameGroup.add(downTube);
+
+            // Seat Post & Sport Saddle
+            const seatTube = createCartoonMesh(new THREE.CylinderGeometry(0.075, 0.075, 0.85, 8), frameColor, 0.15);
+            seatTube.rotation.x = -0.22;
+            seatTube.position.set(0, 0.96, 0.36);
+            frameGroup.add(seatTube);
+
+            const saddle = createCartoonMesh(new THREE.BoxGeometry(0.32, 0.12, 0.52), COLORS.navyOutline, 0);
+            saddle.position.set(0, 1.32, 0.44);
+            frameGroup.add(saddle);
+
+            // Front Fork & Steering Stem
+            const fork = createCartoonMesh(new THREE.CylinderGeometry(0.07, 0.06, 0.95, 8), frameColor, 0.15);
+            fork.rotation.x = 0.22;
+            fork.position.set(0, 0.98, -0.72);
+            frameGroup.add(fork);
+
+            // Handlebars & Grips
+            const handleBar = createCartoonMesh(new THREE.CylinderGeometry(0.06, 0.06, 1.18, 8), 0xffffff, 0.16);
+            handleBar.rotation.z = Math.PI / 2;
+            handleBar.position.set(0, 1.48, -0.64);
+            frameGroup.add(handleBar);
+
+            const gripGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.28, 8);
+            gripGeo.rotateZ(Math.PI / 2);
+            const gripL = createCartoonMesh(gripGeo, palette.shirt, 0.14);
+            gripL.position.set(-0.48, 1.48, -0.64);
+            frameGroup.add(gripL);
+
+            const gripR = createCartoonMesh(gripGeo, palette.shirt, 0.14);
+            gripR.position.set(0.48, 1.48, -0.64);
+            frameGroup.add(gripR);
+
+            // 3. Rider Body (Cel-Shaded Jersey, Bib Shorts, Head, Visor Shades & Aero Helmet)
             const torsoGroup = new THREE.Group();
-            torsoGroup.position.set(0, 1.65, 0.15);
-            torsoGroup.rotation.x = -0.32; // Leaning forward
+            torsoGroup.position.set(0, 1.68, 0.18);
+            torsoGroup.rotation.x = -0.36; // Athletic forward lean
             root.add(torsoGroup);
 
-            const torso = createCartoonMesh(new THREE.CylinderGeometry(0.38, 0.3, 1.05, 12), palette.shirt, 0.1);
+            // Cycling Jersey Torso
+            const torso = createCartoonMesh(new THREE.CylinderGeometry(0.39, 0.31, 1.05, 14), palette.shirt, 0.1);
             torsoGroup.add(torso);
 
+            // Racing Stripe on Back of Jersey
+            const backStripe = new THREE.Mesh(
+                new THREE.BoxGeometry(0.22, 0.85, 0.12),
+                getToonMaterial(0xffffff)
+            );
+            backStripe.position.set(0, 0.02, 0.31);
+            torsoGroup.add(backStripe);
+
             // Shorts / Hips
-            const hips = createCartoonMesh(new THREE.SphereGeometry(0.34, 10, 10), palette.shorts, 0.1);
+            const hips = createCartoonMesh(new THREE.SphereGeometry(0.35, 12, 12), palette.shorts, 0.1);
             hips.position.set(0, -0.52, 0);
             torsoGroup.add(hips);
 
-            // Head & Helmet
-            const head = createCartoonMesh(new THREE.SphereGeometry(0.34, 12, 12), palette.helmet, 0.12);
-            head.position.set(0, 0.82, -0.05);
-            torsoGroup.add(head);
+            // Skin-toned Head
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 0.84, -0.06);
+            headGroup.rotation.x = 0.25; // Looking forward down the track
+            torsoGroup.add(headGroup);
 
-            // Arms
-            const armGeo = new THREE.CylinderGeometry(0.11, 0.1, 0.75, 8);
-            const leftArm = createCartoonMesh(armGeo, palette.shirt, 0.12);
-            leftArm.position.set(-0.42, 0.18, -0.35);
-            leftArm.rotation.x = Math.PI / 3;
+            const head = createCartoonMesh(new THREE.SphereGeometry(0.31, 14, 14), COLORS.skin, 0.11);
+            headGroup.add(head);
+
+            // Wrap-around Sport Sunglasses / Visor
+            const visor = createCartoonMesh(new THREE.BoxGeometry(0.52, 0.16, 0.28), palette.visor || 0x38bdf8, 0.12);
+            visor.position.set(0, 0.03, -0.2);
+            headGroup.add(visor);
+
+            // Aerodynamic Cycling Helmet with Center Stripe
+            const helmetDome = createCartoonMesh(new THREE.SphereGeometry(0.36, 14, 12), palette.helmet, 0.11);
+            helmetDome.scale.set(1.02, 0.82, 1.22);
+            helmetDome.position.set(0, 0.14, 0.04);
+            headGroup.add(helmetDome);
+
+            const helmetStripe = new THREE.Mesh(
+                new THREE.BoxGeometry(0.14, 0.22, 0.72),
+                getToonMaterial(palette.shirt)
+            );
+            helmetStripe.position.set(0, 0.32, 0.04);
+            headGroup.add(helmetStripe);
+
+            // Jersey Sleeves & Arms reaching to Handlebars
+            const sleeveGeo = new THREE.CylinderGeometry(0.14, 0.12, 0.36, 10);
+            const leftSleeve = createCartoonMesh(sleeveGeo, palette.shirt, 0.12);
+            leftSleeve.position.set(-0.42, 0.32, -0.18);
+            leftSleeve.rotation.x = Math.PI / 3;
+            torsoGroup.add(leftSleeve);
+
+            const rightSleeve = createCartoonMesh(sleeveGeo, palette.shirt, 0.12);
+            rightSleeve.position.set(0.42, 0.32, -0.18);
+            rightSleeve.rotation.x = Math.PI / 3;
+            torsoGroup.add(rightSleeve);
+
+            const armGeo = new THREE.CylinderGeometry(0.1, 0.09, 0.65, 10);
+            const leftArm = createCartoonMesh(armGeo, COLORS.skin, 0.12);
+            leftArm.position.set(-0.44, 0.06, -0.45);
+            leftArm.rotation.x = Math.PI / 2.6;
             torsoGroup.add(leftArm);
 
-            const rightArm = createCartoonMesh(armGeo, palette.shirt, 0.12);
-            rightArm.position.set(0.42, 0.18, -0.35);
-            rightArm.rotation.x = Math.PI / 3;
+            const rightArm = createCartoonMesh(armGeo, COLORS.skin, 0.12);
+            rightArm.position.set(0.44, 0.06, -0.45);
+            rightArm.rotation.x = Math.PI / 2.6;
             torsoGroup.add(rightArm);
 
-            // 4. Animated Pedaling Legs
-            const legGeo = new THREE.CylinderGeometry(0.13, 0.11, 0.75, 8);
-            const leftLeg = createCartoonMesh(legGeo, palette.shorts, 0.12);
-            leftLeg.position.set(-0.26, 0.85, 0.15);
+            // 4. Animated Pedaling Legs + Cycling Shoes
+            const createLegAssembly = () => {
+                const legGroup = new THREE.Group();
+                const thigh = createCartoonMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.68, 10), palette.shorts, 0.12);
+                legGroup.add(thigh);
+
+                const shoe = createCartoonMesh(new THREE.BoxGeometry(0.22, 0.15, 0.36), 0xffffff, 0.14);
+                shoe.position.set(0, -0.36, -0.06);
+                legGroup.add(shoe);
+                return legGroup;
+            };
+
+            const leftLeg = createLegAssembly();
+            leftLeg.position.set(-0.27, 0.85, 0.12);
             root.add(leftLeg);
 
-            const rightLeg = createCartoonMesh(legGeo, palette.shorts, 0.12);
-            rightLeg.position.set(0.26, 0.85, 0.15);
+            const rightLeg = createLegAssembly();
+            rightLeg.position.set(0.27, 0.85, 0.12);
             root.add(rightLeg);
 
             return {
@@ -669,8 +1228,70 @@
                 leftLeg,
                 rightLeg,
                 backWheel,
-                frontWheel
+                frontWheel,
+                playerRing
             };
+        }
+
+        /**************************************************************
+         * 3D PARTICLE EFFECTS (Dust Puffs, Boost Trails & Impact Sparks)
+         **************************************************************/
+        const dustGeo = new THREE.DodecahedronGeometry(0.22, 0);
+        const boostGeo = new THREE.BoxGeometry(0.22, 0.12, 0.75);
+        const sparkGeo = new THREE.OctahedronGeometry(0.24, 0);
+
+        function spawnWheelDust(x, z) {
+            if (fxParticles.length > 90) return;
+            const mesh = new THREE.Mesh(dustGeo, getToonMaterial(0xfef3c7));
+            mesh.position.set(x + (Math.random() - 0.5) * 0.35, 0.22, z + 0.95);
+            mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+            fxGroup.add(mesh);
+            fxParticles.push({
+                mesh,
+                vx: (Math.random() - 0.5) * 1.6,
+                vy: 1.1 + Math.random() * 1.4,
+                vz: 2.5 + Math.random() * 2.5,
+                life: 0.38,
+                maxLife: 0.38
+            });
+        }
+
+        function spawnBoostTrail(x, z) {
+            if (fxParticles.length > 110) return;
+            const color = Math.random() < 0.6 ? COLORS.boostCyan : COLORS.gold;
+            const mesh = new THREE.Mesh(boostGeo, new THREE.MeshBasicMaterial({ color }));
+            mesh.position.set(
+                x + (Math.random() - 0.5) * 0.7,
+                0.45 + Math.random() * 0.9,
+                z + 1.0
+            );
+            fxGroup.add(mesh);
+            fxParticles.push({
+                mesh,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: (Math.random() - 0.5) * 0.8,
+                vz: 6.0 + Math.random() * 4.0,
+                life: 0.28,
+                maxLife: 0.28
+            });
+        }
+
+        function spawnImpactBurst(x, y, z, colorHex = 0xfacc15) {
+            for (let i = 0; i < 8; i++) {
+                const mesh = createCartoonMesh(sparkGeo, i % 2 === 0 ? colorHex : 0xffffff, 0.12, false);
+                mesh.position.set(x, y, z);
+                fxGroup.add(mesh);
+                const angle = (i / 8) * Math.PI * 2;
+                fxParticles.push({
+                    mesh,
+                    vx: Math.cos(angle) * (3.5 + Math.random() * 3),
+                    vy: 2.5 + Math.random() * 4.5,
+                    vz: Math.sin(angle) * (3.5 + Math.random() * 3),
+                    life: 0.45,
+                    maxLife: 0.45,
+                    gravity: 14
+                });
+            }
         }
 
         /**************************************************************
@@ -701,7 +1322,7 @@
                 // Floating HTML Rank Label above each cyclist
                 const labelEl = document.createElement('div');
                 labelEl.className = `racer-label ${isPlayer ? 'player-label' : ''}`;
-                labelEl.textContent = '7th';
+                labelEl.textContent = isPlayer ? 'YOU (7th)' : getOrdinal(7 - row * 2 + (i % 2));
                 labelsContainer.appendChild(labelEl);
 
                 // Base speeds tuned so player can overtake with good steering & boost pads
@@ -746,8 +1367,13 @@
         const keys = { left: false, right: false };
 
         window.addEventListener('keydown', (e) => {
+            if ((e.key === ' ' || e.key === 'Enter') && state.mode === 'ready') {
+                e.preventDefault();
+                beginRaceMatch();
+                return;
+            }
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
-            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false ? false : true;
         });
 
         window.addEventListener('keyup', (e) => {
@@ -799,7 +1425,7 @@
 
         function spawnVictoryConfetti(zPos) {
             const colors = [0xf43f5e, 0xfacc15, 0x38bdf8, 0x84cc16, 0xa855f7];
-            for (let i = 0; i < 55; i++) {
+            for (let i = 0; i < 65; i++) {
                 const mat = new THREE.MeshBasicMaterial({
                     color: colors[i % colors.length],
                     side: THREE.DoubleSide
@@ -821,9 +1447,55 @@
         }
 
         function updateGame(dt) {
+            const player = racers[0];
+            state.raceTime += dt;
+
+            // Animate 3D Puffy Sky Clouds & Finish Arch Flags in all active states
+            clouds.forEach(c => {
+                c.mesh.position.x += c.speedX * dt;
+                c.mesh.position.y = c.baseY + Math.sin(state.raceTime * 1.5 + c.phase) * 0.35;
+            });
+
+            finishFlags.forEach(f => {
+                f.mesh.rotation.y = Math.sin(state.raceTime * 7 + f.phase) * 0.28;
+            });
+
+            // Animate Boost Pad Triple Chevrons (Wave pulse forward)
+            boostPads.forEach(pad => {
+                pad.chevrons.forEach((chev, idx) => {
+                    const wave = Math.sin(state.raceTime * 10 - idx * 1.4);
+                    const s = 1 + Math.max(0, wave) * 0.22;
+                    chev.scale.set(s, 1, s);
+                });
+            });
+
+            // Pulse Player Ground Indicator Ring
+            if (player && player.rig.playerRing) {
+                const ringScale = 1 + Math.sin(state.raceTime * 6) * 0.08;
+                player.rig.playerRing.scale.set(ringScale, 1, ringScale);
+            }
+
+            // Pre-Race 'ready' state: Subtle idle breathing on the starting grid & showcase camera
+            if (state.mode === 'ready') {
+                state.idleTime += dt;
+                racers.forEach((r, idx) => {
+                    const phase = state.idleTime * 4 + idx;
+                    r.rig.torsoGroup.position.y = 1.68 + Math.sin(phase) * 0.035;
+                    r.rig.root.rotation.z = Math.sin(phase * 0.5) * 0.025;
+                });
+
+                if (player) {
+                    const swayX = Math.sin(state.idleTime * 0.65) * 2.4;
+                    camera.position.x += (swayX - camera.position.x) * 4 * dt;
+                    camera.position.y += (6.6 - camera.position.y) * 4 * dt;
+                    camera.position.z += ((player.z + 11.2) - camera.position.z) * 4 * dt;
+                    camera.lookAt(0, 1.5, player.z - 14);
+                }
+                return;
+            }
+
             if (state.mode !== 'racing') return;
 
-            const player = racers[0];
             const trackLimit = TRACK_WIDTH / 2 - 1.05;
 
             // Keyboard steering support
@@ -893,17 +1565,31 @@
                 r.rig.root.rotation.z = leanAngle;
                 r.rig.root.rotation.y = leanAngle * 0.35;
 
-                // Pedaling Animation
-                r.pedalPhase += r.speed * dt * 0.85;
-                r.rig.leftLeg.position.y = 0.82 + Math.sin(r.pedalPhase) * 0.22;
-                r.rig.rightLeg.position.y = 0.82 + Math.sin(r.pedalPhase + Math.PI) * 0.22;
+                // Spin Front & Back Spoked Wheels + Pedaling Animation
+                const wheelSpin = r.speed * dt * 1.45;
+                r.rig.frontWheel.rotation.x -= wheelSpin;
+                r.rig.backWheel.rotation.x -= wheelSpin;
+
+                r.pedalPhase += r.speed * dt * 0.88;
+                r.rig.leftLeg.position.y = 0.84 + Math.sin(r.pedalPhase) * 0.24;
+                r.rig.leftLeg.position.z = 0.12 + Math.cos(r.pedalPhase) * 0.12;
+                r.rig.rightLeg.position.y = 0.84 + Math.sin(r.pedalPhase + Math.PI) * 0.24;
+                r.rig.rightLeg.position.z = 0.12 + Math.cos(r.pedalPhase + Math.PI) * 0.12;
                 r.rig.torsoGroup.rotation.z = Math.sin(r.pedalPhase) * 0.06;
+
+                // Emit Wheel Dust & Boost Streak Particles
+                if (r.boostTimer > 0) {
+                    if (Math.random() < 0.75) spawnBoostTrail(r.x, r.z);
+                } else if (Math.random() < (r.isPlayer ? 0.35 : 0.12)) {
+                    spawnWheelDust(r.x, r.z);
+                }
 
                 // Check Boost Pads
                 for (let pad of boostPads) {
                     if (Math.abs(r.z - pad.z) < pad.length / 2 && Math.abs(r.x - pad.x) < pad.width / 2 + 0.4) {
                         if (r.boostTimer <= 0.1) {
                             r.boostTimer = 1.35;
+                            spawnImpactBurst(r.x, 0.6, r.z, COLORS.boostCyan);
                             if (r.isPlayer) playSound('boost');
                         }
                     }
@@ -911,18 +1597,62 @@
 
                 // Check Cup Obstacles
                 for (let obs of obstacles) {
-                    if (!obs.hit && Math.abs(r.z - obs.z) < 1.1 && Math.abs(r.x - obs.x) < obs.radius + 0.45) {
+                    if (!obs.hit && Math.abs(r.z - obs.z) < 1.15 && Math.abs(r.x - obs.x) < obs.radius + 0.45) {
                         obs.hit = true;
                         r.stumbleTimer = 0.65;
                         r.boostTimer = 0;
-                        // Knock cup flying!
-                        obs.mesh.position.y = 1.5;
-                        obs.mesh.rotation.x = 1.2;
-                        obs.mesh.rotation.z = (Math.random() - 0.5) * 2;
+                        // Launch cup flying with 3D tumbling velocity!
+                        obs.vx = (obs.x - r.x) * 8 + (Math.random() - 0.5) * 6;
+                        obs.vy = 9.5 + Math.random() * 4;
+                        obs.vz = -r.speed * 0.85 - 6;
+                        obs.rx = (Math.random() - 0.5) * 14;
+                        obs.ry = (Math.random() - 0.5) * 14;
+                        obs.rz = (Math.random() - 0.5) * 14;
+
+                        spawnImpactBurst(obs.x, 1.0, obs.z, 0xf43f5e);
                         if (r.isPlayer) playSound('bump');
                     }
                 }
             });
+
+            // Update Knocked-Over Tumbling Cup Obstacles
+            obstacles.forEach(obs => {
+                if (obs.hit && obs.y >= 0) {
+                    obs.vy -= 24 * dt; // Gravity
+                    obs.x += obs.vx * dt;
+                    obs.y += obs.vy * dt;
+                    obs.z += obs.vz * dt;
+
+                    if (obs.y < 0.35) {
+                        obs.y = 0.35;
+                        obs.vy = Math.abs(obs.vy) * 0.42;
+                        obs.vx *= 0.75;
+                        obs.vz *= 0.75;
+                    }
+
+                    obs.mesh.position.set(obs.x, obs.y, obs.z);
+                    obs.mesh.rotation.x += obs.rx * dt;
+                    obs.mesh.rotation.y += obs.ry * dt;
+                    obs.mesh.rotation.z += obs.rz * dt;
+                }
+            });
+
+            // Update 3D FX Particles (Dust, Boost Streaks, Impact Sparks)
+            for (let i = fxParticles.length - 1; i >= 0; i--) {
+                const p = fxParticles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    fxGroup.remove(p.mesh);
+                    fxParticles.splice(i, 1);
+                    continue;
+                }
+                if (p.gravity) p.vy -= p.gravity * dt;
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.position.y += p.vy * dt;
+                p.mesh.position.z += p.vz * dt;
+                const scale = Math.max(0.01, p.life / p.maxLife);
+                p.mesh.scale.set(scale, scale, scale);
+            }
 
             // Rider-to-Rider Side Bump Physics
             for (let i = 0; i < racers.length; i++) {
@@ -1019,6 +1749,7 @@
         function finishRace(finalRank) {
             state.mode = 'finished';
             document.getElementById('boost-overlay').style.opacity = '0';
+            document.getElementById('btn-pause').classList.add('invisible');
             spawnVictoryConfetti(-TRACK_LENGTH);
 
             const modal = document.getElementById('game-modal');
@@ -1053,18 +1784,53 @@
 
         function startLevel(lvl) {
             state.level = lvl;
-            state.mode = 'racing';
+            state.mode = 'ready';
+            state.idleTime = 0;
+
             document.getElementById('hud-level').textContent = state.level;
             document.getElementById('level-badge').textContent = state.level;
+            document.getElementById('hud-rank-top').textContent = '7th';
+            document.getElementById('big-rank-display').textContent = '7th';
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('boost-overlay').style.opacity = '0';
+
             document.getElementById('game-modal').classList.add('hidden');
+            document.getElementById('start-overlay').classList.remove('hidden');
+            document.getElementById('btn-pause').classList.add('invisible');
             document.getElementById('btn-pause').textContent = 'PAUSE';
             document.getElementById('steer-prompt').style.opacity = '1';
 
             buildTrack();
             spawnRacers();
+
+            // Position camera immediately behind the starting grid
+            const player = racers[0];
+            if (player) {
+                camera.position.set(0, 6.6, player.z + 11.2);
+                camera.lookAt(0, 1.5, player.z - 14);
+            }
+        }
+
+        async function beginRaceMatch() {
+            if (state.mode !== 'ready') return;
+            await initAudio();
+            playSound('start');
+
+            state.mode = 'racing';
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('btn-pause').classList.remove('invisible');
+
+            // Give the player a crisp mini launch boost off the line
+            if (racers[0]) {
+                racers[0].boostTimer = 0.35;
+            }
         }
 
         // UI Button Listeners
+        document.getElementById('btn-start-match').addEventListener('click', () => {
+            beginRaceMatch();
+        });
+
         document.getElementById('btn-retry').addEventListener('click', () => {
             playSound('click');
             startLevel(state.level);
